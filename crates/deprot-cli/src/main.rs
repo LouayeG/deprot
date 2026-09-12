@@ -41,6 +41,11 @@ struct Cli {
     #[arg(long, value_name = "BASELINE")]
     diff: Option<PathBuf>,
 
+    /// After a `--tree` analysis, compute a remediation plan: for each risky/caution package,
+    /// check whether upgrading to the latest version would improve its grade, and print the fix.
+    #[arg(long)]
+    fix: bool,
+
     /// Browse results in an interactive terminal UI (arrow keys to navigate, live details).
     #[arg(long)]
     tui: bool,
@@ -515,6 +520,10 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         println!("{}", tree_summary(&rows));
     }
 
+    if cli.fix {
+        print_fix_plan(&collector, &rows, now).await;
+    }
+
     if let Some(threshold) = fail_on {
         let worst = rows
             .iter()
@@ -527,4 +536,74 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Remediation solver: for each risky/caution package, check whether the latest version scores
+/// better than the locked one, and print the upgrade that helps most (highest reach first).
+async fn print_fix_plan(collector: &Collector, rows: &[TreeRow], now: chrono::DateTime<Utc>) {
+    use deprot_core::{Dependency, Tier};
+
+    // Candidates: not-OK, with data. Prioritize by tier then blast radius, cap the work.
+    let mut candidates: Vec<&TreeRow> = rows
+        .iter()
+        .filter(|r| r.has_data && r.score.tier != Tier::Ok)
+        .collect();
+    candidates.sort_by(|a, b| b.score.tier.cmp(&a.score.tier).then(b.blast.cmp(&a.blast)));
+    candidates.truncate(20);
+
+    let mut plan: Vec<String> = Vec::new();
+    for r in candidates {
+        let dep = Dependency {
+            name: r.name.clone(),
+            requested: None,
+            ecosystem: r.ecosystem,
+            direct: r.direct,
+        };
+        let latest = collector.collect_one(&dep).await;
+        let Some(latest_ver) = latest.facts.analyzed_version.clone() else {
+            continue;
+        };
+        if latest_ver == r.version {
+            continue; // already on latest
+        }
+        let latest_score = deprot_core::score(&latest.facts, now);
+        // Recommend when the tier improves or the score jumps meaningfully.
+        let improves = latest_score.tier < r.score.tier || latest_score.value >= r.score.value + 10;
+        if improves {
+            let cmd = match r.ecosystem {
+                deprot_core::Ecosystem::Npm => format!("npm install {}@{}", r.name, latest_ver),
+                deprot_core::Ecosystem::Cargo => format!("cargo update -p {}", r.name),
+                deprot_core::Ecosystem::PyPI => {
+                    format!("pip install -U {}=={}", r.name, latest_ver)
+                }
+            };
+            plan.push(format!(
+                "  {} {} {} → {}  (grade {}→{})   {}",
+                "•".green(),
+                r.name.bold(),
+                r.version,
+                latest_ver,
+                r.score.grade.as_str(),
+                latest_score.grade.as_str(),
+                cmd.dimmed(),
+            ));
+        }
+    }
+
+    println!();
+    if plan.is_empty() {
+        println!(
+            "{} no upgrade improves a risky/caution package — issues are in the latest versions too.",
+            "fix plan:".bold()
+        );
+    } else {
+        println!(
+            "{} {} upgrade(s) would improve your risk:",
+            "fix plan:".bold(),
+            plan.len()
+        );
+        for line in plan {
+            println!("{line}");
+        }
+    }
 }
