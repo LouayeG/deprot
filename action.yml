@@ -1,0 +1,36 @@
+name: "deprot dependency check"
+description: "Grade your dependencies for rot & supply-chain risk, and optionally fail the build."
+branding:
+  icon: "shield"
+  color: "green"
+
+inputs:
+  path:
+    description: "Project directory or manifest file to analyze."
+    required: false
+    default: "."
+  fail-on:
+    description: "Fail the job if any dependency is at or worse than this tier (ok | caution | risky)."
+    required: false
+    default: "risky"
+  args:
+    description: "Extra arguments passed verbatim to deprot."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: Swatinem/rust-cache@v2
+
+    - name: Install deprot
+      shell: bash
+      run: cargo install --git https://github.com/LouayeG/deprot deprot --locked
+
+    - name: Run deprot
+      shell: bash
+      run: deprot "${{ inputs.path }}" --fail-on "${{ inputs.fail-on }}" ${{ inputs.args }}
