@@ -1,0 +1,18 @@
+[package]
+name = "deprot-tui"
+description = "Interactive terminal UI for browsing deprot results"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+deprot-core = { workspace = true }
+deprot-report = { workspace = true }
+anyhow = { workspace = true }
+ratatui = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }

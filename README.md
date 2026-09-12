@@ -66,6 +66,7 @@ Or grab a prebuilt binary for your platform from the [Releases](https://github.c
 deprot                      # analyze the manifest in the current directory
 deprot path/to/project      # analyze a project directory
 deprot ./package.json       # analyze a specific manifest file
+deprot --tui                # explore results in an interactive terminal UI
 deprot --prod-only          # skip dev / peer / build dependencies
 deprot --explain lodash     # full signal breakdown for matching package(s)
 deprot --json               # stable machine-readable report (for CI / scripting)
@@ -100,6 +101,32 @@ request 2.88.2  —  score 24/100  grade F  [RISKY]
     scorecard        ███░░░░░░░   34%  (w1.5)  OpenSSF Scorecard overall 3.4/10
     license          ██████████  100%  (w1)  Apache-2.0 (permissive)
 ```
+
+## Interactive TUI
+
+`deprot --tui` opens a keyboard-driven terminal UI: arrow through the dependency list on the left
+and the full signal breakdown for the highlighted package updates live on the right.
+
+```text
+ deprot  5 deps  2 risky  0 caution  3 ok   sort: tier
+┌ dependencies ─────────────────────────┐┌ details ────────────────────────────────────────┐
+│  PACKAGE           SCR  GRD   VERDICT ││ request  2.88.2                                 │
+│▍ request            34  F     RISKY   ││ score 34/100   grade F   [RISKY]                │
+│  left-pad           34  F     RISKY   ││                                                 │
+│  chalk              82  B     OK      ││ Forced RISKY because:                           │
+│  lodash             89  B     OK      ││ • package is deprecated                         │
+│  express            92  A     OK      ││                                                 │
+│                                       ││ Signals                                         │
+│                                       ││ deprecation     ░░░░░░░░░░   0%                  │
+│                                       ││ vulnerabilities ██████████ 100%                 │
+│                                       ││ staleness       ░░░░░░░░░░   0%                  │
+│                                       ││ scorecard       ██████░░░░  60%                  │
+└───────────────────────────────────────┘└─────────────────────────────────────────────────┘
+ ↑/↓ or j/k move   g/G top/bottom   s sort   q quit
+```
+
+Keys: `↑`/`↓` or `j`/`k` to move, `g`/`G` to jump to top/bottom, `s` to cycle the sort
+(tier → score → name), `q` or `Esc` to quit.
 
 ## How scoring works
 
@@ -173,6 +200,7 @@ deprot-manifest   parse a manifest  ->  Vec<Dependency>
 deprot-collect    fetch public data ->  Facts        (the only crate that touches the network)
 deprot-core       Facts             ->  Score        (pure, zero-I/O, fully deterministic)
 deprot-report     Score             ->  table / JSON / --explain
+deprot-tui        Score             ->  interactive ratatui browser (--tui)
 deprot-cli        wires it together and owns the CLI + exit codes
 ```
 

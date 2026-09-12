@@ -29,6 +29,10 @@ struct Cli {
     #[arg(default_value = ".")]
     path: PathBuf,
 
+    /// Browse results in an interactive terminal UI (arrow keys to navigate, live details).
+    #[arg(long)]
+    tui: bool,
+
     /// Emit machine-readable JSON instead of the table.
     #[arg(long)]
     json: bool,
@@ -124,7 +128,17 @@ async fn run() -> Result<()> {
         .collect();
 
     // 4. Render.
-    if cli.json {
+    if cli.tui {
+        use std::io::IsTerminal;
+        if !std::io::stdout().is_terminal() {
+            return Err(anyhow!(
+                "--tui requires an interactive terminal; omit it for table output or use --json"
+            ));
+        }
+        deprot_tui::run(rows)?;
+        // The interactive UI is for exploration; skip the CI gate when it's used.
+        return Ok(());
+    } else if cli.json {
         println!("{}", to_json(&rows));
     } else if let Some(filter) = &cli.explain {
         let mut shown = 0;
