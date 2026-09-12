@@ -9,8 +9,10 @@ use anyhow::{anyhow, Context, Result};
 use deprot_core::{Dependency, Ecosystem};
 use std::path::{Path, PathBuf};
 
+mod cargo;
 mod npm;
 
+pub use cargo::CargoManifest;
 pub use npm::NpmManifest;
 
 /// A parser for one ecosystem's manifest format.
@@ -24,8 +26,8 @@ pub trait Manifest {
 /// The candidate manifest filenames deprot knows how to read, in detection priority order.
 const CANDIDATES: &[(&str, Ecosystem)] = &[
     ("package.json", Ecosystem::Npm),
-    // Additional ecosystems (Cargo.toml, requirements.txt, ...) are registered here as their
-    // adapters land.
+    ("Cargo.toml", Ecosystem::Cargo),
+    // Additional ecosystems (requirements.txt, ...) are registered here as their adapters land.
 ];
 
 /// The result of resolving a target path: which file was read and what it contained.
@@ -82,6 +84,7 @@ fn parser_for(path: &Path) -> Option<Box<dyn Manifest>> {
     let name = path.file_name()?.to_str()?;
     match name {
         "package.json" => Some(Box::new(NpmManifest)),
+        "Cargo.toml" => Some(Box::new(CargoManifest)),
         _ => None,
     }
 }

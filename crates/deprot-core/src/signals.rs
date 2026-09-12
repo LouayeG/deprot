@@ -134,9 +134,23 @@ pub fn license(facts: &Facts) -> Option<Signal> {
     ];
     let copyleft = ["GPL", "LGPL", "AGPL", "MPL"];
     let joined = facts.licenses.join(", ");
-    let upper: Vec<String> = facts.licenses.iter().map(|l| l.to_uppercase()).collect();
-    let is_permissive = upper.iter().any(|l| permissive.contains(&l.as_str()));
-    let is_copyleft = upper.iter().any(|l| copyleft.iter().any(|c| l.contains(c)));
+    // Break SPDX expressions ("Apache-2.0 OR MIT", "(MIT AND BSD-3-Clause)") into individual
+    // identifier tokens so a compound-but-permissive license is still recognized as permissive.
+    let tokens: Vec<String> = facts
+        .licenses
+        .iter()
+        .flat_map(|l| {
+            l.to_uppercase()
+                .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                .filter(|t| !t.is_empty() && *t != "OR" && *t != "AND" && *t != "WITH")
+                .map(|t| t.to_string())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let is_permissive = tokens.iter().any(|t| permissive.contains(&t.as_str()));
+    let is_copyleft = tokens
+        .iter()
+        .any(|t| copyleft.iter().any(|c| t.contains(c)));
     let (score, note) = if is_permissive {
         (1.0, "permissive")
     } else if is_copyleft {
@@ -197,6 +211,36 @@ pub fn archived(facts: &Facts) -> Option<Signal> {
         3.0,
         "source repository is archived".to_string(),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn facts_with_licenses(l: &[&str]) -> Facts {
+        Facts {
+            licenses: l.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn spdx_or_expression_is_permissive() {
+        let sig = license(&facts_with_licenses(&["Apache-2.0 OR MIT"])).unwrap();
+        assert_eq!(sig.score, 1.0, "{}", sig.detail);
+    }
+
+    #[test]
+    fn copyleft_is_penalized() {
+        let sig = license(&facts_with_licenses(&["GPL-3.0-only"])).unwrap();
+        assert!(sig.score < 0.75);
+    }
+
+    #[test]
+    fn missing_license_is_low() {
+        let sig = license(&facts_with_licenses(&[])).unwrap();
+        assert!(sig.score <= 0.3);
+    }
 }
 
 /// Compute every applicable signal for a set of facts, in display order.
