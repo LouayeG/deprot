@@ -1,5 +1,15 @@
 <div align="center">
 
+```text
+██████╗  ███████╗ ██████╗  ██████╗   ██████╗  ████████╗
+██╔══██╗ ██╔════╝ ██╔══██╗ ██╔══██╗ ██╔═══██╗ ╚══██╔══╝
+██║  ██║ █████╗   ██████╔╝ ██████╔╝ ██║   ██║    ██║   
+██║  ██║ ██╔══╝   ██╔═══╝  ██╔══██╗ ██║   ██║    ██║   
+██████╔╝ ███████╗ ██║      ██║  ██║ ╚██████╔╝    ██║   
+╚═════╝  ╚══════╝ ╚═╝      ╚═╝  ╚═╝  ╚═════╝     ╚═╝   
+                   made by LouayeG
+```
+
 # deprot
 
 **Grade your dependencies for rot & supply-chain risk — local, no API keys, no cloud, no signup.**
@@ -104,33 +114,45 @@ request 2.88.2  —  score 24/100  grade F  [RISKY]
 
 ## Interactive TUI
 
-`deprot --tui` opens a keyboard-driven terminal UI: arrow through the dependency list on the left
-and the full signal breakdown for the highlighted package updates live on the right.
+`deprot --tui` opens a keyboard-driven terminal UI. A **project-health hero gauge** sits across the
+top; the left column pairs a navigable dependency list with a **grade-distribution chart**; the
+right pane shows the selected package's **big letter grade**, forced-risk reasons, and its signal
+bars (which animate in as you move the selection).
 
 ```text
- deprot  5 deps  2 risky  0 caution  3 ok   sort: tier
-┌ dependencies ─────────────────────────┐┌ details ────────────────────────────────────────┐
-│  PACKAGE           SCR  GRD   VERDICT ││ request  2.88.2                                 │
-│▍ request            34  F     RISKY   ││ score 34/100   grade F   [RISKY]                │
-│  left-pad           34  F     RISKY   ││                                                 │
-│  chalk              82  B     OK      ││ Forced RISKY because:                           │
-│  lodash             89  B     OK      ││ • package is deprecated                         │
-│  express            92  A     OK      ││ Signals                                         │
-└───────────────────────────────────────┘│ deprecation     ░░░░░░░░░░   0%                 │
-┌ grade distribution ───────────────────┐│ vulnerabilities ██████████ 100%                 │
-│       █████                █████      ││ staleness       ░░░░░░░░░░   0%                 │
-│       █████                █████      ││ cadence         ░░░░░░░░░░   0%                 │
-│█████  █████                █████      ││ scorecard       ██████░░░░  60%                 │
-│██1██  ██2██                ██2██      ││ license         ██████████ 100%                 │
-│  A      B      C      D      F        ││ ...                                             │
-└───────────────────────────────────────┘└─────────────────────────────────────────────────┘
- ↑/↓ or j/k move   g/G top/bottom   s sort   q quit
+╭ DEPROT · project health ─────────────────────────────────────────────────────────────────╮
+│█████████████████████ 66/100  ·  grade C  ·  2 risky  0 caution  3 ok                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
+╭ dependencies ─────────────────────────╮╭ details ────────────────────────────────────────╮
+│  PACKAGE           SCR  GRD   VERDICT ││███████╗                                         │
+│▍ request            34  F     RISKY   ││██╔════╝   request                               │
+│  left-pad           34  F     RISKY   ││█████╗     2.88.2                                │
+│  chalk              82  B     OK      ││██╔══╝     34/100  [RISKY]                       │
+│  lodash             89  B     OK      ││██║                                              │
+│  express            92  A     OK      ││╚═╝                                              │
+╰───────────────────────────────────────╯│⚠ Forced RISKY because:                          │
+╭ grade distribution ───────────────────╮│• package is deprecated                          │
+│       █████                █████      ││                                                 │
+│█████  █████                █████      ││Signals                                          │
+│██1██  ██2██                ██2██      ││deprecation     ░░░░░░░░░░   0%                  │
+│  A      B      C      D      F        ││vulnerabilities ██████████ 100%                 │
+╰───────────────────────────────────────╯╰─────────────────────────────────────────────────╯
+ ↑/↓ move · / search · f filter [all] · s sort [tier] · ? help · q quit
 ```
 
-The left column pairs a navigable list with a **grade-distribution bar chart** (one bar per
-letter grade, colored A→F green→red); the right pane shows the highlighted package's full signal
-breakdown, live. Keys: `↑`/`↓` or `j`/`k` to move, `g`/`G` to jump to top/bottom, `s` to cycle the
-sort (tier → score → name), `q` or `Esc` to quit.
+It opens with a brief branded splash. Keys:
+
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` or `j`/`k` | move selection |
+| `g` / `G` | jump to top / bottom |
+| `PgUp` / `PgDn` | scroll the details pane |
+| `/` | search by package name (live filter) |
+| `f` | cycle verdict filter (all → risky → caution+) |
+| `s` | cycle sort (tier → score → name) |
+| `o` | open the package's registry page in your browser |
+| `?` | toggle the help overlay |
+| `q` / `Esc` | quit |
 
 ## How scoring works
 
