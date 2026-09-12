@@ -159,6 +159,19 @@ impl Collector {
     }
 }
 
+impl Collector {
+    /// Fetch a package's release timeline `(version, published_at)`, oldest first.
+    pub async fn history(
+        &self,
+        ecosystem: Ecosystem,
+        name: &str,
+    ) -> anyhow::Result<Vec<(String, chrono::DateTime<Utc>)>> {
+        self.depsdev
+            .version_timeline(system_for(ecosystem), name)
+            .await
+    }
+}
+
 /// Facts collected for one node of a dependency graph.
 pub struct GraphFacts {
     /// Index into `graph.nodes()`.

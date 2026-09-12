@@ -62,6 +62,10 @@ struct Cli {
     #[arg(long)]
     sbom: bool,
 
+    /// Show a package's release history over time (a "time machine" of its cadence and staleness).
+    #[arg(long, value_name = "PACKAGE")]
+    history: Option<String>,
+
     /// Show a full signal breakdown. Optionally filter to package names containing this string.
     #[arg(long, value_name = "PACKAGE", num_args = 0..=1, default_missing_value = "")]
     explain: Option<String>,
@@ -119,6 +123,11 @@ async fn run() -> Result<()> {
         })?),
         None => None,
     };
+
+    // History mode shows one package's release timeline.
+    if let Some(pkg) = cli.history.clone() {
+        return run_history(&cli, &pkg).await;
+    }
 
     // Diff mode compares two lockfiles.
     if let Some(baseline) = cli.diff.clone() {
@@ -268,6 +277,102 @@ async fn run() -> Result<()> {
         std::process::exit(1);
     }
 
+    Ok(())
+}
+
+/// Time-machine: print a package's release history — a per-year cadence histogram, the longest
+/// gap between releases, and its current staleness. The ecosystem is taken from the target path's
+/// manifest.
+async fn run_history(cli: &Cli, pkg: &str) -> Result<()> {
+    let ecosystem = deprot_manifest::detect(&cli.path)
+        .map(|d| d.ecosystem)
+        .or_else(|_| deprot_manifest::detect_lockfile(&cli.path).map(|r| r.ecosystem))
+        .unwrap_or(deprot_core::Ecosystem::Npm);
+
+    let config = CollectorConfig {
+        concurrency: 1,
+        cache_ttl_secs: if cli.refresh {
+            0
+        } else {
+            DEFAULT_CACHE_TTL_SECS
+        },
+        cache_enabled: !cli.no_cache,
+        enrich: false,
+    };
+    let collector = Collector::new(config)?;
+    let timeline = collector.history(ecosystem, pkg).await?;
+
+    if timeline.is_empty() {
+        eprintln!(
+            "no release history found for {pkg} on {}",
+            ecosystem.label()
+        );
+        return Ok(());
+    }
+
+    let first = timeline.first().unwrap();
+    let last = timeline.last().unwrap();
+    let now = Utc::now();
+
+    println!(
+        "{} — {} releases on {} ({} → {})",
+        pkg.bold(),
+        timeline.len(),
+        ecosystem.label(),
+        first.1.format("%Y-%m-%d"),
+        last.1.format("%Y-%m-%d"),
+    );
+
+    // Per-year release histogram.
+    use std::collections::BTreeMap;
+    let mut per_year: BTreeMap<i32, usize> = BTreeMap::new();
+    for (_, d) in &timeline {
+        *per_year
+            .entry(d.format("%Y").to_string().parse().unwrap_or(0))
+            .or_default() += 1;
+    }
+    let max = per_year.values().copied().max().unwrap_or(1);
+    println!("\n{}", "releases per year".bold());
+    for (year, count) in &per_year {
+        let bar = "█".repeat((*count * 24 / max).max(1));
+        println!("  {year}  {} {count}", bar.cyan());
+    }
+
+    // Longest gap between consecutive releases.
+    let mut longest_gap = 0i64;
+    let mut gap_at = None;
+    for w in timeline.windows(2) {
+        let gap = (w[1].1 - w[0].1).num_days();
+        if gap > longest_gap {
+            longest_gap = gap;
+            gap_at = Some((w[0].clone(), w[1].clone()));
+        }
+    }
+    if let Some((a, b)) = gap_at {
+        println!(
+            "\n{} {} days between {} ({}) and {} ({})",
+            "longest gap:".bold(),
+            longest_gap,
+            a.0,
+            a.1.format("%Y-%m-%d"),
+            b.0,
+            b.1.format("%Y-%m-%d"),
+        );
+    }
+    let staleness = (now - last.1).num_days();
+    let staleness_str = format!(
+        "current staleness: {staleness} days since {} ({})",
+        last.0,
+        last.1.format("%Y-%m-%d")
+    );
+    println!(
+        "{}",
+        if staleness > 365 {
+            staleness_str.red().to_string()
+        } else {
+            staleness_str.green().to_string()
+        }
+    );
     Ok(())
 }
 

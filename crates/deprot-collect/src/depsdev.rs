@@ -129,6 +129,28 @@ impl DepsDev {
         ))
     }
 
+    /// Fetch the full release timeline `(version, published_at)` for a package, oldest first.
+    pub async fn version_timeline(
+        &self,
+        system: &str,
+        name: &str,
+    ) -> Result<Vec<(String, DateTime<Utc>)>> {
+        let enc = urlencode(name);
+        let pkg: Option<PackageResp> = self
+            .get_json(&format!("{BASE}/systems/{system}/packages/{enc}"))
+            .await?;
+        let mut out: Vec<(String, DateTime<Utc>)> = pkg
+            .map(|p| {
+                p.versions
+                    .into_iter()
+                    .filter_map(|e| e.published_at.map(|d| (e.version_key.version, d)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.sort_by_key(|(_, d)| *d);
+        Ok(out)
+    }
+
     /// Collect everything deprot knows about one package into [`Facts`].
     ///
     /// Strategy: fetch the package's version list (staleness, cadence, which version is default),
