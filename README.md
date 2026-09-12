@@ -82,7 +82,32 @@ deprot --explain lodash     # full signal breakdown for matching package(s)
 deprot --json               # stable machine-readable report (for CI / scripting)
 deprot --fail-on risky      # exit non-zero if anything is RISKY (or worse)
 deprot --refresh            # ignore cached facts and refetch
+
+# beyond the basics
+deprot --tree               # resolve the WHOLE tree + blast radius + highest-leverage fix
+deprot --tree --fix         # remediation plan: upgrades that improve your grades
+deprot --deep               # maintainer capture-risk + install-script (code-on-install) detection
+deprot --diff base.lock     # PR mode: risk delta of added/removed/changed deps
+deprot --history express    # a package's release history over time (cadence, gaps, staleness)
+deprot --sarif              # SARIF 2.1.0 for GitHub code scanning
+deprot --sbom               # CycloneDX 1.5 SBOM with risk attached
+deprot --offline            # air-gapped: cache-only, zero network
 ```
+
+## What sets deprot apart
+
+Things the cloud incumbents don't do locally — and deprot does, with no keys:
+
+- **Transitive tree + blast radius** (`--tree`): scores your *entire* resolved tree at exact
+  locked versions and ranks by how many packages each risky one puts at risk.
+- **Maintainer capture-risk** (`--deep`): flags when a single maintainer controls a large share of
+  your supply chain — the `xz`-style concentration risk.
+- **Install-script detection** (`--deep`): surfaces packages that run code on install.
+- **Typosquat detection**: catches names 1–2 edits from a popular package (offline).
+- **Remediation solver** (`--fix`): the exact upgrades that raise your grades, most impactful first.
+- **Policy-as-code** (`.deprot.toml`): enforce standards with time-boxed waivers.
+- **PR diff** (`--diff`), **release time-machine** (`--history`), **SARIF/SBOM export**, and a fully
+  **air-gapped** mode (`--offline`).
 
 ### Supported ecosystems
 
