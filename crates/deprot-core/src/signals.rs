@@ -213,6 +213,23 @@ pub fn archived(facts: &Facts) -> Option<Signal> {
     ))
 }
 
+/// Compute every applicable signal for a set of facts, in display order.
+pub fn all(facts: &Facts, now: DateTime<Utc>) -> Vec<Signal> {
+    [
+        deprecation(facts),
+        archived(facts),
+        vulnerabilities(facts),
+        staleness(facts, now),
+        cadence(facts),
+        scorecard(facts),
+        bus_factor(facts),
+        license(facts),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,21 +258,4 @@ mod tests {
         let sig = license(&facts_with_licenses(&[])).unwrap();
         assert!(sig.score <= 0.3);
     }
-}
-
-/// Compute every applicable signal for a set of facts, in display order.
-pub fn all(facts: &Facts, now: DateTime<Utc>) -> Vec<Signal> {
-    [
-        deprecation(facts),
-        archived(facts),
-        vulnerabilities(facts),
-        staleness(facts, now),
-        cadence(facts),
-        scorecard(facts),
-        bus_factor(facts),
-        license(facts),
-    ]
-    .into_iter()
-    .flatten()
-    .collect()
 }
