@@ -21,4 +21,5 @@ deprot-report = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
+chrono = { workspace = true }
 owo-colors = { workspace = true }
