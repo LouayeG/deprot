@@ -25,7 +25,11 @@ pub fn explain(row: &Row) -> String {
     out.push('\n');
 
     if let Some(err) = &row.error {
-        out.push_str(&format!("  {} {}\n", "!".red(), format!("lookup failed: {err}").red()));
+        out.push_str(&format!(
+            "  {} {}\n",
+            "!".red(),
+            format!("lookup failed: {err}").red()
+        ));
         return out;
     }
 

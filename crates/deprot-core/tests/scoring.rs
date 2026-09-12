@@ -41,10 +41,7 @@ fn deprecation_forces_risky() {
     };
     let s = score(&facts, now());
     assert_eq!(s.tier, Tier::Risky);
-    assert!(s
-        .forced_reasons
-        .iter()
-        .any(|r| r.contains("deprecated")));
+    assert!(s.forced_reasons.iter().any(|r| r.contains("deprecated")));
 }
 
 /// An unfixed high/critical advisory forces RISKY.

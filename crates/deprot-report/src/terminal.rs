@@ -82,7 +82,11 @@ fn top_reason(row: &Row) -> String {
         .signals
         .iter()
         .filter(|s| s.score < 0.75)
-        .min_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+        .min_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
         .map(|s| s.detail.clone())
         .unwrap_or_else(|| "healthy".to_string())
 }

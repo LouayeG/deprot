@@ -123,7 +123,15 @@ pub fn license(facts: &Facts) -> Option<Signal> {
             "no license declared".to_string(),
         ));
     }
-    let permissive = ["MIT", "APACHE-2.0", "BSD-2-CLAUSE", "BSD-3-CLAUSE", "ISC", "0BSD", "UNLICENSE"];
+    let permissive = [
+        "MIT",
+        "APACHE-2.0",
+        "BSD-2-CLAUSE",
+        "BSD-3-CLAUSE",
+        "ISC",
+        "0BSD",
+        "UNLICENSE",
+    ];
     let copyleft = ["GPL", "LGPL", "AGPL", "MPL"];
     let joined = facts.licenses.join(", ");
     let upper: Vec<String> = facts.licenses.iter().map(|l| l.to_uppercase()).collect();
@@ -171,7 +179,10 @@ pub fn bus_factor(facts: &Facts) -> Option<Signal> {
         "bus_factor",
         score,
         1.5,
-        format!("top contributor authored {:.0}% of recent commits", share * 100.0),
+        format!(
+            "top contributor authored {:.0}% of recent commits",
+            share * 100.0
+        ),
     ))
 }
 

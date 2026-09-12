@@ -110,12 +110,23 @@ impl DepsDev {
     }
 
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, url: &str) -> Result<Option<T>> {
-        let resp = self.http.get(url).send().await.with_context(|| format!("GET {url}"))?;
+        let resp = self
+            .http
+            .get(url)
+            .send()
+            .await
+            .with_context(|| format!("GET {url}"))?;
         if resp.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        let resp = resp.error_for_status().with_context(|| format!("GET {url}"))?;
-        Ok(Some(resp.json::<T>().await.with_context(|| format!("decoding {url}"))?))
+        let resp = resp
+            .error_for_status()
+            .with_context(|| format!("GET {url}"))?;
+        Ok(Some(
+            resp.json::<T>()
+                .await
+                .with_context(|| format!("decoding {url}"))?,
+        ))
     }
 
     /// Collect everything deprot knows about one package into [`Facts`].

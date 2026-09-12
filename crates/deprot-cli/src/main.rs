@@ -101,7 +101,11 @@ async fn run() -> Result<()> {
     // 2. Collect facts from public sources (concurrent, cached).
     let config = CollectorConfig {
         concurrency: cli.concurrency.max(1),
-        cache_ttl_secs: if cli.refresh { 0 } else { DEFAULT_CACHE_TTL_SECS },
+        cache_ttl_secs: if cli.refresh {
+            0
+        } else {
+            DEFAULT_CACHE_TTL_SECS
+        },
         cache_enabled: !cli.no_cache,
     };
     let collector = Collector::new(config)?;
@@ -141,11 +145,7 @@ async fn run() -> Result<()> {
 
     // 5. CI gate.
     if let Some(threshold) = fail_on {
-        let worst = rows
-            .iter()
-            .map(|r| r.score.tier)
-            .max()
-            .unwrap_or(Tier::Ok);
+        let worst = rows.iter().map(|r| r.score.tier).max().unwrap_or(Tier::Ok);
         if worst >= threshold {
             std::process::exit(1);
         }

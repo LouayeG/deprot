@@ -126,11 +126,7 @@ pub fn score(facts: &Facts, now: DateTime<Utc>) -> Score {
     if facts.archived {
         forced_reasons.push("source repository is archived".to_string());
     }
-    if let Some(v) = facts
-        .vulns
-        .iter()
-        .find(|v| v.severity() >= Severity::High)
-    {
+    if let Some(v) = facts.vulns.iter().find(|v| v.severity() >= Severity::High) {
         forced_reasons.push(format!("unresolved high/critical advisory {}", v.id));
     }
     if !forced_reasons.is_empty() {
