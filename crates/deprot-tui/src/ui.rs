@@ -7,7 +7,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row as TableRow, Table, Wrap},
+    widgets::{
+        Bar, BarChart, BarGroup, Block, Borders, Cell, Paragraph, Row as TableRow, Table, Wrap,
+    },
     Frame,
 };
 
@@ -47,7 +49,14 @@ pub fn draw(f: &mut Frame, app: &App) {
         .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
         .split(chunks[1]);
 
-    draw_list(f, app, body[0]);
+    // Left column: the dependency list on top, a grade-distribution chart beneath it.
+    let left = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(3), Constraint::Length(9)])
+        .split(body[0]);
+
+    draw_list(f, app, left[0]);
+    draw_chart(f, app, left[1]);
     draw_detail(f, app, body[1]);
 
     draw_footer(f, app, chunks[2]);
@@ -126,6 +135,53 @@ fn draw_list(f: &mut Frame, app: &App, area: Rect) {
     );
 
     f.render_widget(table, area);
+}
+
+/// A bar chart of how many dependencies fall in each letter grade (A→F). Grades are an ordered
+/// good→bad status ramp, so each bar is colored by its own grade color (color follows the entity),
+/// and each bar is directly labeled with its count — no separate legend needed.
+fn draw_chart(f: &mut Frame, app: &App, area: Rect) {
+    let mut counts = [0u64; 5]; // A, B, C, D, F
+    for r in &app.rows {
+        let idx = match r.score.grade {
+            Grade::A => 0,
+            Grade::B => 1,
+            Grade::C => 2,
+            Grade::D => 3,
+            Grade::F => 4,
+        };
+        counts[idx] += 1;
+    }
+    let grades = [Grade::A, Grade::B, Grade::C, Grade::D, Grade::F];
+    let bars: Vec<Bar> = grades
+        .iter()
+        .zip(counts)
+        .map(|(g, n)| {
+            Bar::default()
+                .value(n)
+                .label(Line::from(g.as_str()))
+                .text_value(n.to_string())
+                .style(Style::default().fg(grade_color(*g)))
+                .value_style(
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(grade_color(*g))
+                        .add_modifier(Modifier::BOLD),
+                )
+        })
+        .collect();
+
+    let chart = BarChart::default()
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" grade distribution "),
+        )
+        .data(BarGroup::default().bars(&bars))
+        .bar_width(5)
+        .bar_gap(2);
+
+    f.render_widget(chart, area);
 }
 
 fn draw_detail(f: &mut Frame, app: &App, area: Rect) {

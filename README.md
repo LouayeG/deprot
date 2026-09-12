@@ -115,18 +115,22 @@ and the full signal breakdown for the highlighted package updates live on the ri
 │  left-pad           34  F     RISKY   ││                                                 │
 │  chalk              82  B     OK      ││ Forced RISKY because:                           │
 │  lodash             89  B     OK      ││ • package is deprecated                         │
-│  express            92  A     OK      ││                                                 │
-│                                       ││ Signals                                         │
-│                                       ││ deprecation     ░░░░░░░░░░   0%                  │
-│                                       ││ vulnerabilities ██████████ 100%                 │
-│                                       ││ staleness       ░░░░░░░░░░   0%                  │
-│                                       ││ scorecard       ██████░░░░  60%                  │
+│  express            92  A     OK      ││ Signals                                         │
+└───────────────────────────────────────┘│ deprecation     ░░░░░░░░░░   0%                 │
+┌ grade distribution ───────────────────┐│ vulnerabilities ██████████ 100%                 │
+│       █████                █████      ││ staleness       ░░░░░░░░░░   0%                 │
+│       █████                █████      ││ cadence         ░░░░░░░░░░   0%                 │
+│█████  █████                █████      ││ scorecard       ██████░░░░  60%                 │
+│██1██  ██2██                ██2██      ││ license         ██████████ 100%                 │
+│  A      B      C      D      F        ││ ...                                             │
 └───────────────────────────────────────┘└─────────────────────────────────────────────────┘
  ↑/↓ or j/k move   g/G top/bottom   s sort   q quit
 ```
 
-Keys: `↑`/`↓` or `j`/`k` to move, `g`/`G` to jump to top/bottom, `s` to cycle the sort
-(tier → score → name), `q` or `Esc` to quit.
+The left column pairs a navigable list with a **grade-distribution bar chart** (one bar per
+letter grade, colored A→F green→red); the right pane shows the highlighted package's full signal
+breakdown, live. Keys: `↑`/`↓` or `j`/`k` to move, `g`/`G` to jump to top/bottom, `s` to cycle the
+sort (tier → score → name), `q` or `Esc` to quit.
 
 ## How scoring works
 
