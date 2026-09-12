@@ -260,7 +260,7 @@ async fn scored_lockfile(
             (node.version.clone(), score.tier, score.value),
         );
     }
-    let mean = if n > 0 { (sum / n) as u8 } else { 0 };
+    let mean = sum.checked_div(n).unwrap_or(0) as u8;
     Ok((mean, map))
 }
 
