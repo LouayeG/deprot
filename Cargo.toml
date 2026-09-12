@@ -15,17 +15,20 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/LouayeG/deprot"
+homepage = "https://github.com/LouayeG/deprot"
 authors = ["LouayeG"]
 rust-version = "1.75"
+keywords = ["dependencies", "security", "supply-chain", "audit", "sbom"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
-# internal
-deprot-core = { path = "crates/deprot-core" }
-deprot-manifest = { path = "crates/deprot-manifest" }
-deprot-collect = { path = "crates/deprot-collect" }
-deprot-report = { path = "crates/deprot-report" }
-deprot-policy = { path = "crates/deprot-policy" }
-deprot-tui = { path = "crates/deprot-tui" }
+# internal (path + version so each crate is publishable to crates.io)
+deprot-core = { path = "crates/deprot-core", version = "0.1.0" }
+deprot-manifest = { path = "crates/deprot-manifest", version = "0.1.0" }
+deprot-collect = { path = "crates/deprot-collect", version = "0.1.0" }
+deprot-report = { path = "crates/deprot-report", version = "0.1.0" }
+deprot-policy = { path = "crates/deprot-policy", version = "0.1.0" }
+deprot-tui = { path = "crates/deprot-tui", version = "0.1.0" }
 # external
 anyhow = "1"
 thiserror = "1"
