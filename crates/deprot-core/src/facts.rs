@@ -1,0 +1,124 @@
+//! Input types for the scoring engine.
+//!
+//! [`Dependency`] is *what to look at* (produced by a manifest parser); [`Facts`] is *everything
+//! we learned about it* (produced by a collector). The scoring engine in [`crate::score`] reads
+//! only [`Facts`] — it never knows which ecosystem or data source produced them, which is what
+//! keeps deprot ecosystem-agnostic.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+/// A package ecosystem. New ecosystems are added here and wired up with a manifest + collector
+/// adapter; the scoring engine does not change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Ecosystem {
+    Npm,
+    Cargo,
+    PyPI,
+}
+
+impl Ecosystem {
+    /// The identifier deps.dev uses for this ecosystem (their "system" path segment).
+    pub fn deps_dev_system(self) -> &'static str {
+        match self {
+            Ecosystem::Npm => "npm",
+            Ecosystem::Cargo => "cargo",
+            Ecosystem::PyPI => "pypi",
+        }
+    }
+
+    /// Human-facing label.
+    pub fn label(self) -> &'static str {
+        match self {
+            Ecosystem::Npm => "npm",
+            Ecosystem::Cargo => "crates.io",
+            Ecosystem::PyPI => "PyPI",
+        }
+    }
+}
+
+/// A single dependency to analyze, as extracted from a manifest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Dependency {
+    /// Registry name of the package (e.g. `lodash`, `serde`).
+    pub name: String,
+    /// The version requirement as written in the manifest (e.g. `^4.17.0`), if any.
+    pub requested: Option<String>,
+    /// Which ecosystem this dependency belongs to.
+    pub ecosystem: Ecosystem,
+    /// Whether this is a direct dependency (vs. transitive / dev-only).
+    pub direct: bool,
+}
+
+/// A known vulnerability affecting the analyzed version.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Vuln {
+    /// Advisory identifier (e.g. a GHSA id).
+    pub id: String,
+    /// CVSS v3 base score (0.0–10.0), if published.
+    pub cvss: Option<f64>,
+    /// Short human-readable title.
+    pub title: Option<String>,
+}
+
+impl Vuln {
+    /// Severity bucket derived from the CVSS score. Missing scores are treated as `Medium` so an
+    /// unscored-but-real advisory is never silently ignored.
+    pub fn severity(&self) -> Severity {
+        match self.cvss {
+            Some(s) if s >= 9.0 => Severity::Critical,
+            Some(s) if s >= 7.0 => Severity::High,
+            Some(s) if s >= 4.0 => Severity::Medium,
+            Some(_) => Severity::Low,
+            None => Severity::Medium,
+        }
+    }
+}
+
+/// Coarse severity bucket for a [`Vuln`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Severity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+/// Everything deprot learned about one dependency. Populated by the collector from public data
+/// sources; all fields are optional so the engine degrades gracefully when a source is
+/// unavailable (e.g. no auth, offline, or the package has no linked repository).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Facts {
+    /// The concrete version these facts describe (the version deprot chose to analyze).
+    pub analyzed_version: Option<String>,
+    /// When the most recent release was published (drives the staleness signal).
+    pub latest_published: Option<DateTime<Utc>>,
+    /// Number of releases published in the trailing 12 months (drives the cadence signal).
+    pub releases_last_year: Option<u32>,
+    /// Total number of published versions ever.
+    pub total_versions: Option<u32>,
+    /// The registry has marked this version (or package) deprecated.
+    pub deprecated: bool,
+    /// Reason string attached to the deprecation, if any.
+    pub deprecated_reason: Option<String>,
+    /// The source repository is archived (read-only / abandoned upstream).
+    pub archived: bool,
+    /// SPDX-ish license identifiers reported for the analyzed version.
+    pub licenses: Vec<String>,
+    /// Known vulnerabilities affecting the analyzed version.
+    pub vulns: Vec<Vuln>,
+    /// Canonical source repository (e.g. `github.com/lodash/lodash`), if known.
+    pub repo: Option<String>,
+    /// Repository star count, if known.
+    pub stars: Option<u64>,
+    /// Open issue count, if known.
+    pub open_issues: Option<u64>,
+    /// OpenSSF Scorecard "Maintained" check (0–10), if available.
+    pub scorecard_maintained: Option<f64>,
+    /// OpenSSF Scorecard aggregate score (0–10), if available.
+    pub scorecard_overall: Option<f64>,
+    /// Fraction (0.0–1.0) of recent commits authored by the single most active contributor.
+    /// High concentration = high bus-factor / capture risk. Optional (needs a GitHub token).
+    pub top_contributor_share: Option<f64>,
+}

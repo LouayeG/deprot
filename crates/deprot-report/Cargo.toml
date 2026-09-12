@@ -1,0 +1,16 @@
+[package]
+name = "deprot-report"
+description = "Renderers (terminal, JSON) for deprot results"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+deprot-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+owo-colors = { workspace = true }
+comfy-table = { workspace = true }

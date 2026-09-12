@@ -1,0 +1,24 @@
+[package]
+name = "deprot"
+description = "Grade your dependencies for rot & supply-chain risk — local, no keys, no cloud"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+default-run = "deprot"
+
+[[bin]]
+name = "deprot"
+path = "src/main.rs"
+
+[dependencies]
+deprot-core = { workspace = true }
+deprot-manifest = { workspace = true }
+deprot-collect = { workspace = true }
+deprot-report = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+owo-colors = { workspace = true }
