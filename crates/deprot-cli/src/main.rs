@@ -44,6 +44,14 @@ struct Cli {
     #[arg(long)]
     json: bool,
 
+    /// Emit a SARIF 2.1.0 report (for GitHub code scanning and security tooling).
+    #[arg(long)]
+    sarif: bool,
+
+    /// Emit a CycloneDX 1.5 SBOM with deprot's risk assessment attached to each component.
+    #[arg(long)]
+    sbom: bool,
+
     /// Show a full signal breakdown. Optionally filter to package names containing this string.
     #[arg(long, value_name = "PACKAGE", num_args = 0..=1, default_missing_value = "")]
     explain: Option<String>,
@@ -159,6 +167,10 @@ async fn run() -> Result<()> {
         deprot_tui::run(rows)?;
         // The interactive UI is for exploration; skip the CI gate when it's used.
         return Ok(());
+    } else if cli.sarif {
+        println!("{}", deprot_report::to_sarif(&rows));
+    } else if cli.sbom {
+        println!("{}", deprot_report::to_cyclonedx(&rows));
     } else if cli.json {
         println!("{}", to_json(&rows));
     } else if let Some(filter) = &cli.explain {

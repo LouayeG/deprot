@@ -9,6 +9,8 @@
 
 mod explain;
 mod json;
+mod sarif;
+mod sbom;
 mod terminal;
 mod tree;
 
@@ -16,6 +18,8 @@ use deprot_core::{Dependency, Score};
 
 pub use explain::explain;
 pub use json::to_json;
+pub use sarif::to_sarif;
+pub use sbom::to_cyclonedx;
 pub use terminal::{summary_banner, table};
 pub use tree::{tree_summary, tree_table, tree_to_json, TreeRow};
 
