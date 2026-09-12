@@ -3,3 +3,6 @@
 Cargo.lock.orig
 .DS_Store
 *.log
+
+# Windows alternate-data-stream metadata
+*:Zone.Identifier
