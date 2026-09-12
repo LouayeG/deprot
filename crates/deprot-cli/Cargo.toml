@@ -18,6 +18,7 @@ deprot-core = { workspace = true }
 deprot-manifest = { workspace = true }
 deprot-collect = { workspace = true }
 deprot-report = { workspace = true }
+deprot-policy = { workspace = true }
 deprot-tui = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }

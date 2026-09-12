@@ -382,6 +382,7 @@ dependencies = [
  "deprot-collect",
  "deprot-core",
  "deprot-manifest",
+ "deprot-policy",
  "deprot-report",
  "deprot-tui",
  "owo-colors",
@@ -420,6 +421,17 @@ dependencies = [
  "deprot-core",
  "serde",
  "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "deprot-policy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "deprot-core",
+ "serde",
  "toml",
 ]
 

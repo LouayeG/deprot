@@ -64,6 +64,14 @@ struct Cli {
     #[arg(long)]
     refresh: bool,
 
+    /// Path to a policy file (defaults to `.deprot.toml` in the project directory if present).
+    #[arg(long, value_name = "FILE")]
+    policy: Option<PathBuf>,
+
+    /// Ignore any `.deprot.toml` policy file.
+    #[arg(long)]
+    no_policy: bool,
+
     /// Maximum number of concurrent lookups.
     #[arg(long, default_value_t = 12)]
     concurrency: usize,
@@ -127,8 +135,9 @@ async fn run() -> Result<()> {
     let collector = Collector::new(config)?;
     let collected = collector.collect_all(&deps).await;
 
-    // 3. Score (pure) and build render rows.
+    // 3. Score (pure) and build render rows. Facts are kept alongside for policy evaluation.
     let now = Utc::now();
+    let facts: Vec<deprot_core::Facts> = collected.iter().map(|c| c.facts.clone()).collect();
     let rows: Vec<Row> = collected
         .into_iter()
         .map(|c| Row {
@@ -169,15 +178,60 @@ async fn run() -> Result<()> {
         println!("{}", summary_banner(&rows));
     }
 
-    // 5. CI gate.
-    if let Some(threshold) = fail_on {
-        let worst = rows.iter().map(|r| r.score.tier).max().unwrap_or(Tier::Ok);
-        if worst >= threshold {
-            std::process::exit(1);
+    // 5. Policy evaluation (`.deprot.toml`), if present.
+    let policy_dir = detected
+        .path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let mut policy_failed = false;
+    if !cli.no_policy {
+        if let Some(policy) = deprot_policy::Policy::load(policy_dir, cli.policy.as_deref())? {
+            let subjects: Vec<deprot_policy::Subject> = rows
+                .iter()
+                .zip(&facts)
+                .map(|(row, f)| deprot_policy::Subject {
+                    name: &row.dependency.name,
+                    facts: f,
+                    score: &row.score,
+                })
+                .collect();
+            let violations = policy.evaluate(&subjects, Utc::now().date_naive());
+            print_violations(&violations);
+            policy_failed = !violations.is_empty();
         }
     }
 
+    // 6. CI gate: fail on the tier threshold or any policy violation.
+    let tier_failed = fail_on
+        .map(|threshold| rows.iter().map(|r| r.score.tier).max().unwrap_or(Tier::Ok) >= threshold)
+        .unwrap_or(false);
+    if tier_failed || policy_failed {
+        std::process::exit(1);
+    }
+
     Ok(())
+}
+
+/// Print policy violations to stderr (so JSON stdout stays clean), grouped and colored.
+fn print_violations(violations: &[deprot_policy::Violation]) {
+    if violations.is_empty() {
+        return;
+    }
+    eprintln!();
+    eprintln!(
+        "{} {} policy violation(s):",
+        "✗".red().bold(),
+        violations.len()
+    );
+    for v in violations {
+        eprintln!(
+            "  {} {} — {} [{}]",
+            "•".red(),
+            v.package.bold(),
+            v.detail,
+            v.rule.dimmed()
+        );
+    }
 }
 
 /// Transitive-tree analysis: resolve the lockfile, score every node at its exact version, compute

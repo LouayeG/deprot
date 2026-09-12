@@ -217,6 +217,47 @@ deprot --json > deprot-report.json
 deprot --fail-on caution   # non-zero exit fails the job
 ```
 
+## Policy as code
+
+Drop a `.deprot.toml` in your repo to turn deprot into an enforceable team standard. deprot
+auto-discovers it, reports every violation, and exits non-zero so CI fails the build — the thing
+`npm audit` / `cargo audit` can't express. **Waivers are time-boxed**: an exception carries a
+reason and an expiry, after which it stops suppressing the violation.
+
+```toml
+# .deprot.toml
+min_score = 60
+max_age_days = 730
+required_scorecard = 4.0
+
+[licenses]
+deny = ["GPL-3.0", "AGPL-3.0"]
+# allow_only = ["MIT", "Apache-2.0", "ISC"]
+
+[packages]
+deny = ["request", "left-pad"]
+
+[[waivers]]
+package = "lodash"
+reason  = "risk accepted for Q1; migration tracked in JIRA-123"
+until   = "2026-06-01"
+```
+
+Point at a specific file with `--policy path/to/file.toml`, or skip enforcement with `--no-policy`.
+
+## Transitive tree & blast radius
+
+`deprot --tree` resolves your **entire** dependency tree from the lockfile (`Cargo.lock` or
+`package-lock.json`), scores every package at its **exact locked version**, and reports each one's
+**blast radius** — how many of your packages transitively depend on it. It then names the single
+**highest-leverage fix** (risk × reach): the one upgrade or replacement that removes the most risk.
+
+```text
+$ deprot --tree
+… 252 packages in the resolved tree (6 direct) — 31 risky  74 caution  141 ok
+★ highest-leverage fix: upgrade or replace cfg-if — grade C, 42 dependent(s).
+```
+
 ## Architecture
 
 deprot is a small Cargo workspace with a strict "pure core, I/O at the edges" split:
@@ -225,7 +266,8 @@ deprot is a small Cargo workspace with a strict "pure core, I/O at the edges" sp
 deprot-manifest   parse a manifest  ->  Vec<Dependency>
 deprot-collect    fetch public data ->  Facts        (the only crate that touches the network)
 deprot-core       Facts             ->  Score        (pure, zero-I/O, fully deterministic)
-deprot-report     Score             ->  table / JSON / --explain
+deprot-report     Score             ->  table / JSON / --explain / --tree
+deprot-policy     Facts + Score     ->  policy violations (.deprot.toml)
 deprot-tui        Score             ->  interactive ratatui browser (--tui)
 deprot-cli        wires it together and owns the CLI + exit codes
 ```
