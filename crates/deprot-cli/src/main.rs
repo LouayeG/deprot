@@ -36,6 +36,11 @@ struct Cli {
     #[arg(long)]
     tree: bool,
 
+    /// Compare the target against a baseline lockfile (PR mode): show added/removed/changed
+    /// dependencies and the net change in project risk.
+    #[arg(long, value_name = "BASELINE")]
+    diff: Option<PathBuf>,
+
     /// Browse results in an interactive terminal UI (arrow keys to navigate, live details).
     #[arg(long)]
     tui: bool,
@@ -103,6 +108,11 @@ async fn run() -> Result<()> {
         })?),
         None => None,
     };
+
+    // Diff mode compares two lockfiles.
+    if let Some(baseline) = cli.diff.clone() {
+        return run_diff(&cli, &baseline, fail_on).await;
+    }
 
     // Transitive-tree mode analyzes the resolved lockfile instead of the manifest.
     if cli.tree {
@@ -221,6 +231,123 @@ async fn run() -> Result<()> {
         std::process::exit(1);
     }
 
+    Ok(())
+}
+
+/// Resolve a lockfile at `path`, collect + score every node, and return `(mean_score, map)` where
+/// the map is `name -> (version, tier, value)`.
+async fn scored_lockfile(
+    collector: &Collector,
+    path: &std::path::Path,
+) -> Result<(u8, std::collections::BTreeMap<String, (String, Tier, u8)>)> {
+    let resolved = deprot_manifest::detect_lockfile(path)
+        .with_context(|| format!("resolving lockfile at {}", path.display()))?;
+    let gfacts = collector.collect_graph(&resolved.graph).await;
+    let now = Utc::now();
+    let mut map = std::collections::BTreeMap::new();
+    let mut sum = 0u32;
+    let mut n = 0u32;
+    for gf in gfacts {
+        let node = &resolved.graph.nodes()[gf.index];
+        if gf.facts.analyzed_version.is_none() {
+            continue; // skip local/workspace/unknown
+        }
+        let score = deprot_core::score(&gf.facts, now);
+        sum += score.value as u32;
+        n += 1;
+        map.insert(
+            node.name.clone(),
+            (node.version.clone(), score.tier, score.value),
+        );
+    }
+    let mean = if n > 0 { (sum / n) as u8 } else { 0 };
+    Ok((mean, map))
+}
+
+/// PR mode: diff the resolved tree of `cli.path` against a `baseline` lockfile.
+async fn run_diff(cli: &Cli, baseline: &std::path::Path, fail_on: Option<Tier>) -> Result<()> {
+    let config = CollectorConfig {
+        concurrency: cli.concurrency.max(1),
+        cache_ttl_secs: if cli.refresh {
+            0
+        } else {
+            DEFAULT_CACHE_TTL_SECS
+        },
+        cache_enabled: !cli.no_cache,
+    };
+    let collector = Collector::new(config)?;
+
+    eprintln!(
+        "{} {} {} → {} ...",
+        "deprot".bold(),
+        "diffing".dimmed(),
+        baseline.display(),
+        cli.path.display()
+    );
+    let (base_mean, base) = scored_lockfile(&collector, baseline).await?;
+    let (new_mean, new) = scored_lockfile(&collector, &cli.path).await?;
+
+    let verdict = |t: Tier| match t {
+        Tier::Ok => "OK".green().to_string(),
+        Tier::Caution => "CAUTION".yellow().to_string(),
+        Tier::Risky => "RISKY".red().to_string(),
+    };
+
+    let mut added_risky = false;
+
+    let added: Vec<_> = new.iter().filter(|(k, _)| !base.contains_key(*k)).collect();
+    let removed: Vec<_> = base.iter().filter(|(k, _)| !new.contains_key(*k)).collect();
+    let changed: Vec<_> = new
+        .iter()
+        .filter_map(|(k, nv)| base.get(k).filter(|bv| bv.0 != nv.0).map(|bv| (k, bv, nv)))
+        .collect();
+
+    println!("{}", "Dependency diff".bold());
+    println!("\n{} ({})", "added".bold(), added.len());
+    for (name, (ver, tier, _)) in &added {
+        if *tier == Tier::Risky {
+            added_risky = true;
+        }
+        println!("  {} {name} {ver}  [{}]", "+".green(), verdict(*tier));
+    }
+    println!("\n{} ({})", "removed".bold(), removed.len());
+    for (name, (ver, _, _)) in &removed {
+        println!("  {} {name} {ver}", "-".red());
+    }
+    println!("\n{} ({})", "version-changed".bold(), changed.len());
+    for (name, bv, nv) in &changed {
+        println!(
+            "  {} {name} {} → {}  [{}]",
+            "~".yellow(),
+            bv.0,
+            nv.0,
+            verdict(nv.1)
+        );
+    }
+
+    let delta = new_mean as i32 - base_mean as i32;
+    let sign = if delta >= 0 { "+" } else { "" };
+    let delta_str = format!("{sign}{delta}");
+    println!(
+        "\n{} {base_mean} → {new_mean}  ({})",
+        "project health:".bold(),
+        if delta >= 0 {
+            delta_str.green().to_string()
+        } else {
+            delta_str.red().to_string()
+        }
+    );
+
+    // In PR mode, --fail-on gates on newly-added dependencies at/above the threshold.
+    if let Some(threshold) = fail_on {
+        let worst_added = added.iter().map(|(_, v)| v.1).max().unwrap_or(Tier::Ok);
+        if worst_added >= threshold {
+            std::process::exit(1);
+        }
+    } else if added_risky {
+        // Sensible default: a PR that introduces a RISKY dependency fails.
+        std::process::exit(1);
+    }
     Ok(())
 }
 

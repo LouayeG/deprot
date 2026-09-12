@@ -55,17 +55,17 @@ pub fn detect_lockfile(path: &Path) -> Result<ResolvedGraph> {
     let contents = std::fs::read_to_string(&lock_path)
         .with_context(|| format!("reading {}", lock_path.display()))?;
 
-    let (ecosystem, graph) = match name {
-        "Cargo.lock" => (
+    let (ecosystem, graph) = match recognize(name, &contents) {
+        Some(Ecosystem::Cargo) => (
             Ecosystem::Cargo,
             parse_cargo_lock(&contents, direct_names(&lock_path, Ecosystem::Cargo))
-                .context("parsing Cargo.lock")?,
+                .context("parsing Cargo lockfile")?,
         ),
-        "package-lock.json" => (
+        Some(Ecosystem::Npm) => (
             Ecosystem::Npm,
-            parse_npm_lock(&contents).context("parsing package-lock.json")?,
+            parse_npm_lock(&contents).context("parsing npm lockfile")?,
         ),
-        other => return Err(anyhow!("unsupported lockfile: {other}")),
+        _ => return Err(anyhow!("unrecognized lockfile: {}", lock_path.display())),
     };
 
     Ok(ResolvedGraph {
@@ -94,6 +94,24 @@ fn direct_names(lock_path: &Path, eco: Ecosystem) -> BTreeSet<String> {
             .map(|deps| deps.into_iter().map(|d| d.name).collect())
             .unwrap_or_default(),
         None => BTreeSet::new(),
+    }
+}
+
+/// Identify a lockfile's ecosystem by filename, falling back to sniffing its contents (so a
+/// baseline copied to an arbitrary name, e.g. for `--diff`, still resolves).
+fn recognize(name: &str, contents: &str) -> Option<Ecosystem> {
+    match name {
+        "Cargo.lock" => return Some(Ecosystem::Cargo),
+        "package-lock.json" => return Some(Ecosystem::Npm),
+        _ => {}
+    }
+    let trimmed = contents.trim_start();
+    if trimmed.starts_with('{') && contents.contains("lockfileVersion") {
+        Some(Ecosystem::Npm)
+    } else if contents.contains("[[package]]") {
+        Some(Ecosystem::Cargo)
+    } else {
+        None
     }
 }
 
