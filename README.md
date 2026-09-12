@@ -6,8 +6,9 @@
 
 **A local-first supply-chain risk scanner that grades every dependency A→F — no API keys, no cloud, no signup.**
 
-[![crates.io](https://img.shields.io/crates/v/deprot.svg?logo=rust)](https://crates.io/crates/deprot)
-[![downloads](https://img.shields.io/crates/d/deprot.svg)](https://crates.io/crates/deprot)
+[![crates.io](https://img.shields.io/crates/v/deprot?logo=rust&color=fc8d62)](https://crates.io/crates/deprot)
+[![docs.rs](https://img.shields.io/docsrs/deprot-core?logo=docs.rs&label=docs.rs)](https://docs.rs/deprot-core)
+[![downloads](https://img.shields.io/crates/d/deprot?color=orange)](https://crates.io/crates/deprot)
 [![CI](https://github.com/LouayeG/deprot/actions/workflows/ci.yml/badge.svg)](https://github.com/LouayeG/deprot/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](#license)
 
