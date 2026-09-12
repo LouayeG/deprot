@@ -10,12 +10,14 @@
 mod explain;
 mod json;
 mod terminal;
+mod tree;
 
 use deprot_core::{Dependency, Score};
 
 pub use explain::explain;
 pub use json::to_json;
 pub use terminal::{summary_banner, table};
+pub use tree::{tree_summary, tree_table, tree_to_json, TreeRow};
 
 /// A scored dependency ready to render: the dependency, the facts-derived score, and any error
 /// that occurred while collecting its facts.

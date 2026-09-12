@@ -10,9 +10,11 @@
 //! letter [`Grade`], a [`Tier`] verdict, and the list of [`Signal`]s that explain it).
 
 mod facts;
+mod graph;
 mod score;
 mod signals;
 
 pub use facts::{Dependency, Ecosystem, Facts, Vuln};
+pub use graph::{DepGraph, DepNode};
 pub use score::{score, Grade, Score, Tier};
 pub use signals::Signal;

@@ -132,9 +132,17 @@ impl DepsDev {
     /// Collect everything deprot knows about one package into [`Facts`].
     ///
     /// Strategy: fetch the package's version list (staleness, cadence, which version is default),
-    /// then the default version's detail (licenses, advisories, linked repo), then enrich with
+    /// then a specific version's detail (licenses, advisories, linked repo), then enrich with
     /// advisory severities and — if a source repo is linked — its OpenSSF Scorecard and repo stats.
-    pub async fn collect(&self, system: &str, name: &str, now: DateTime<Utc>) -> Result<Facts> {
+    /// When `pin` is `Some`, that exact version is analyzed (used for lockfile-resolved trees);
+    /// otherwise the registry default (else newest) version is used.
+    pub async fn collect(
+        &self,
+        system: &str,
+        name: &str,
+        pin: Option<&str>,
+        now: DateTime<Utc>,
+    ) -> Result<Facts> {
         let mut facts = Facts::default();
         let enc = urlencode(name);
 
@@ -143,7 +151,7 @@ impl DepsDev {
             .get_json(&format!("{BASE}/systems/{system}/packages/{enc}"))
             .await?;
         let Some(pkg) = pkg else {
-            // Unknown package: return empty facts; the engine handles it gracefully.
+            // Unknown package (e.g. a local/workspace crate): return empty facts.
             return Ok(facts);
         };
 
@@ -157,17 +165,19 @@ impl DepsDev {
                 .count() as u32,
         );
 
-        // Choose the version to analyze: the registry's default, else the newest by date.
-        let chosen = pkg
-            .versions
-            .iter()
-            .find(|v| v.is_default)
-            .or_else(|| {
-                pkg.versions
-                    .iter()
-                    .max_by_key(|v| v.published_at.unwrap_or(DateTime::<Utc>::MIN_UTC))
-            })
-            .map(|v| v.version_key.version.clone());
+        // Choose the version to analyze: the pinned one if given, else the registry's default,
+        // else the newest by date.
+        let chosen = pin.map(|p| p.to_string()).or_else(|| {
+            pkg.versions
+                .iter()
+                .find(|v| v.is_default)
+                .or_else(|| {
+                    pkg.versions
+                        .iter()
+                        .max_by_key(|v| v.published_at.unwrap_or(DateTime::<Utc>::MIN_UTC))
+                })
+                .map(|v| v.version_key.version.clone())
+        });
 
         let Some(version) = chosen else {
             return Ok(facts);

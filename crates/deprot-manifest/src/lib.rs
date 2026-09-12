@@ -10,9 +10,11 @@ use deprot_core::{Dependency, Ecosystem};
 use std::path::{Path, PathBuf};
 
 mod cargo;
+mod lockfile;
 mod npm;
 
 pub use cargo::CargoManifest;
+pub use lockfile::{detect_lockfile, ResolvedGraph};
 pub use npm::NpmManifest;
 
 /// A parser for one ecosystem's manifest format.

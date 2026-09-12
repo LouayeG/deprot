@@ -10,7 +10,9 @@ use chrono::Utc;
 use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::Tier;
-use deprot_report::{explain, summary_banner, table, to_json, Row};
+use deprot_report::{
+    explain, summary_banner, table, to_json, tree_summary, tree_table, tree_to_json, Row, TreeRow,
+};
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
 
@@ -28,6 +30,11 @@ struct Cli {
     /// Project directory or manifest file to analyze (defaults to the current directory).
     #[arg(default_value = ".")]
     path: PathBuf,
+
+    /// Analyze the full resolved dependency tree from a lockfile (transitive deps + blast radius),
+    /// not just the direct dependencies in the manifest.
+    #[arg(long)]
+    tree: bool,
 
     /// Browse results in an interactive terminal UI (arrow keys to navigate, live details).
     #[arg(long)]
@@ -80,6 +87,11 @@ async fn run() -> Result<()> {
         })?),
         None => None,
     };
+
+    // Transitive-tree mode analyzes the resolved lockfile instead of the manifest.
+    if cli.tree {
+        return run_tree(&cli, fail_on).await;
+    }
 
     // 1. Parse the manifest.
     let detected = deprot_manifest::detect(&cli.path)
@@ -165,5 +177,76 @@ async fn run() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+/// Transitive-tree analysis: resolve the lockfile, score every node at its exact version, compute
+/// blast radius, and report the tree plus the highest-leverage fix.
+async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
+    let resolved = deprot_manifest::detect_lockfile(&cli.path)
+        .with_context(|| format!("resolving lockfile at {}", cli.path.display()))?;
+    if resolved.graph.is_empty() {
+        eprintln!("no dependencies in {}", resolved.path.display());
+        return Ok(());
+    }
+
+    eprintln!(
+        "{} {} {} packages (resolved tree) from {} ...",
+        "deprot".bold(),
+        "analyzing".dimmed(),
+        resolved.graph.len(),
+        resolved.path.display(),
+    );
+
+    let config = CollectorConfig {
+        concurrency: cli.concurrency.max(1),
+        cache_ttl_secs: if cli.refresh {
+            0
+        } else {
+            DEFAULT_CACHE_TTL_SECS
+        },
+        cache_enabled: !cli.no_cache,
+    };
+    let collector = Collector::new(config)?;
+    let gfacts = collector.collect_graph(&resolved.graph).await;
+    let radii = resolved.graph.blast_radii();
+    let now = Utc::now();
+
+    let rows: Vec<TreeRow> = gfacts
+        .into_iter()
+        .map(|gf| {
+            let node = &resolved.graph.nodes()[gf.index];
+            TreeRow {
+                name: node.name.clone(),
+                version: node.version.clone(),
+                ecosystem: node.ecosystem,
+                direct: node.direct,
+                blast: radii[gf.index],
+                has_data: gf.facts.analyzed_version.is_some(),
+                score: deprot_core::score(&gf.facts, now),
+                error: gf.error,
+            }
+        })
+        .collect();
+
+    if cli.json {
+        println!("{}", tree_to_json(&rows));
+    } else {
+        println!("{}", tree_table(&rows));
+        println!();
+        println!("{}", tree_summary(&rows));
+    }
+
+    if let Some(threshold) = fail_on {
+        let worst = rows
+            .iter()
+            .filter(|r| r.has_data)
+            .map(|r| r.score.tier)
+            .max()
+            .unwrap_or(Tier::Ok);
+        if worst >= threshold {
+            std::process::exit(1);
+        }
+    }
     Ok(())
 }

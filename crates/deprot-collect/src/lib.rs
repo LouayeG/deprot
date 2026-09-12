@@ -11,7 +11,7 @@ mod cache;
 mod depsdev;
 
 use chrono::Utc;
-use deprot_core::{Dependency, Ecosystem, Facts};
+use deprot_core::{DepGraph, Dependency, Ecosystem, Facts};
 use futures::stream::{self, StreamExt};
 use std::sync::Arc;
 use std::time::Duration;
@@ -72,33 +72,38 @@ impl Collector {
         })
     }
 
-    /// Collect facts for a single dependency, consulting the cache first.
-    pub async fn collect_one(&self, dep: &Dependency) -> Collected {
-        let system = system_for(dep.ecosystem);
-        let ckey = cache::key(system, &dep.name);
-
+    /// Collect facts for one package name at an optional pinned version, consulting the cache
+    /// first. Returns just the facts (plus any error string).
+    async fn fetch(
+        &self,
+        ecosystem: Ecosystem,
+        name: &str,
+        pin: Option<&str>,
+    ) -> (Facts, Option<String>) {
+        let system = system_for(ecosystem);
+        let ckey = match pin {
+            Some(v) => cache::key(system, &format!("{name}@{v}")),
+            None => cache::key(system, name),
+        };
         if let Some(facts) = self.cache.get(&ckey) {
-            return Collected {
-                dependency: dep.clone(),
-                facts,
-                error: None,
-            };
+            return (facts, None);
         }
-
-        match self.depsdev.collect(system, &dep.name, Utc::now()).await {
+        match self.depsdev.collect(system, name, pin, Utc::now()).await {
             Ok(facts) => {
                 self.cache.put(&ckey, &facts);
-                Collected {
-                    dependency: dep.clone(),
-                    facts,
-                    error: None,
-                }
+                (facts, None)
             }
-            Err(e) => Collected {
-                dependency: dep.clone(),
-                facts: Facts::default(),
-                error: Some(e.to_string()),
-            },
+            Err(e) => (Facts::default(), Some(e.to_string())),
+        }
+    }
+
+    /// Collect facts for a single dependency (analyzing its default/latest version).
+    pub async fn collect_one(&self, dep: &Dependency) -> Collected {
+        let (facts, error) = self.fetch(dep.ecosystem, &dep.name, None).await;
+        Collected {
+            dependency: dep.clone(),
+            facts,
+            error,
         }
     }
 
@@ -111,6 +116,38 @@ impl Collector {
             .collect()
             .await
     }
+
+    /// Collect facts for every node of a resolved dependency graph, at each node's *exact* locked
+    /// version. Returns facts indexed to match `graph.nodes()`.
+    pub async fn collect_graph(&self, graph: &DepGraph) -> Vec<GraphFacts> {
+        let results = stream::iter(graph.nodes().iter().enumerate())
+            .map(|(idx, node)| async move {
+                let (facts, error) = self
+                    .fetch(node.ecosystem, &node.name, Some(&node.version))
+                    .await;
+                GraphFacts {
+                    index: idx,
+                    facts,
+                    error,
+                }
+            })
+            .buffer_unordered(self.config.concurrency)
+            .collect::<Vec<_>>()
+            .await;
+        let mut sorted = results;
+        sorted.sort_by_key(|g| g.index);
+        sorted
+    }
+}
+
+/// Facts collected for one node of a dependency graph.
+pub struct GraphFacts {
+    /// Index into `graph.nodes()`.
+    pub index: usize,
+    /// Facts gathered for the node's exact version.
+    pub facts: Facts,
+    /// Set when collection failed.
+    pub error: Option<String>,
 }
 
 /// Map a core [`Ecosystem`] to the deps.dev system identifier.
