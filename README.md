@@ -86,19 +86,11 @@ exactly which gremlin did it.
 paired with a **grade-distribution chart**, and a detail pane with a **giant letter grade** + animated
 signal bars for whatever you've selected. It even greets you with a splash. 😎
 
-```text
-╭ DEPROT · project health ─────────────────────────────────────────────────────────────────╮
-│█████████████████████ 66/100  ·  grade C  ·  2 risky  0 caution  3 ok                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────╯
-╭ dependencies ─────────────────────────╮╭ details ────────────────────────────────────────╮
-│▍ request            34  F     RISKY   ││███████╗                                         │
-│  left-pad           34  F     RISKY   ││██╔════╝   request  2.88.2                        │
-│  chalk              82  B     OK      ││█████╗     34/100  [RISKY]                       │
-│  lodash             89  B     OK      ││██╔══╝     ⚠ package is deprecated               │
-│  express            92  A     OK      ││██║        deprecation     ░░░░░░░░░░   0%        │
-╰───────────────────────────────────────╯╰─────────────────────────────────────────────────╯
- ↑/↓ move · / search · f filter · s sort · ? help · q quit
-```
+<div align="center">
+<img src="https://raw.githubusercontent.com/LouayeG/deprot/main/assets/preview.png" alt="deprot TUI — the interactive dashboard" width="900">
+</div>
+
+<sub>Keys: `↑/↓` move · `/` search · `f` filter · `s` sort · `?` help · `q` quit</sub>
 
 ## The party tricks 🎩
 
