@@ -32,6 +32,8 @@ pub struct CollectorConfig {
     /// Whether to enrich facts with registry data (maintainers + install scripts). Off by default
     /// because it adds a request per package.
     pub enrich: bool,
+    /// Air-gapped mode: never touch the network; serve only from the on-disk cache.
+    pub offline: bool,
 }
 
 impl Default for CollectorConfig {
@@ -41,6 +43,7 @@ impl Default for CollectorConfig {
             cache_ttl_secs: 24 * 60 * 60,
             cache_enabled: true,
             enrich: false,
+            offline: false,
         }
     }
 }
@@ -102,6 +105,13 @@ impl Collector {
         let ckey = cache::key(system, &base);
         if let Some(facts) = self.cache.get(&ckey) {
             return (facts, None);
+        }
+        // Air-gapped: never hit the network. A cache miss is reported, not fetched.
+        if self.config.offline {
+            return (
+                Facts::default(),
+                Some(format!("offline: no cached data for {name}")),
+            );
         }
         match self.depsdev.collect(system, name, pin, Utc::now()).await {
             Ok(mut facts) => {

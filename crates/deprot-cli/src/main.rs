@@ -92,6 +92,11 @@ struct Cli {
     #[arg(long)]
     refresh: bool,
 
+    /// Air-gapped mode: never touch the network; use only previously-cached data. Warm the cache
+    /// with an online run first.
+    #[arg(long)]
+    offline: bool,
+
     /// Path to a policy file (defaults to `.deprot.toml` in the project directory if present).
     #[arg(long, value_name = "FILE")]
     policy: Option<PathBuf>,
@@ -170,6 +175,7 @@ async fn run() -> Result<()> {
         },
         cache_enabled: !cli.no_cache,
         enrich: cli.deep,
+        offline: cli.offline,
     };
     let collector = Collector::new(config)?;
     let collected = collector.collect_all(&deps).await;
@@ -298,6 +304,7 @@ async fn run_history(cli: &Cli, pkg: &str) -> Result<()> {
         },
         cache_enabled: !cli.no_cache,
         enrich: false,
+        offline: cli.offline,
     };
     let collector = Collector::new(config)?;
     let timeline = collector.history(ecosystem, pkg).await?;
@@ -417,6 +424,7 @@ async fn run_diff(cli: &Cli, baseline: &std::path::Path, fail_on: Option<Tier>) 
         },
         cache_enabled: !cli.no_cache,
         enrich: false,
+        offline: cli.offline,
     };
     let collector = Collector::new(config)?;
 
@@ -594,6 +602,7 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         },
         cache_enabled: !cli.no_cache,
         enrich: false,
+        offline: cli.offline,
     };
     let collector = Collector::new(config)?;
     let gfacts = collector.collect_graph(&resolved.graph).await;
