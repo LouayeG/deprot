@@ -1,26 +1,29 @@
 <div align="center">
 
-```text
-██████╗  ███████╗ ██████╗  ██████╗   ██████╗  ████████╗
-██╔══██╗ ██╔════╝ ██╔══██╗ ██╔══██╗ ██╔═══██╗ ╚══██╔══╝
-██║  ██║ █████╗   ██████╔╝ ██████╔╝ ██║   ██║    ██║   
-██║  ██║ ██╔══╝   ██╔═══╝  ██╔══██╗ ██║   ██║    ██║   
-██████╔╝ ███████╗ ██║      ██║  ██║ ╚██████╔╝    ██║   
-╚═════╝  ╚══════╝ ╚═╝      ╚═╝  ╚═╝  ╚═════╝     ╚═╝   
-                   made by LouayeG
-```
+<img src="https://raw.githubusercontent.com/LouayeG/deprot/main/assets/logo.png" alt="deprot" width="620">
 
-# deprot
+### Your dependencies are rotting. `deprot` tells you which ones. 🦀🧟
 
-**Grade your dependencies for rot & supply-chain risk — local, no API keys, no cloud, no signup.**
+**A local-first supply-chain risk scanner that grades every dependency A→F — no API keys, no cloud, no signup.**
 
-Point it at any project and get an instant, explainable health report on every dependency:
-a **0–100 score**, a **letter grade**, and an **OK / CAUTION / RISKY** verdict — with the reasons.
-
+[![crates.io](https://img.shields.io/crates/v/deprot.svg?logo=rust)](https://crates.io/crates/deprot)
+[![downloads](https://img.shields.io/crates/d/deprot.svg)](https://crates.io/crates/deprot)
 [![CI](https://github.com/LouayeG/deprot/actions/workflows/ci.yml/badge.svg)](https://github.com/LouayeG/deprot/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](#license)
+[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](#license)
 
 </div>
+
+---
+
+## The pitch, in one breath
+
+Your `package.json` / `Cargo.toml` is a pile of promises made by strangers on the internet. Some of
+those strangers wandered off years ago. Some quietly handed their keys to someone new. Some shipped a
+vulnerability you've never heard of. That slow decay is **dependency rot**, and `deprot` is the smoke
+detector.
+
+Point it at a project and it hands back a **report card**: a `0–100` score, a letter **grade**, and an
+**OK / CAUTION / RISKY** verdict for every dependency — and, crucially, *the reasons why*.
 
 ```text
 $ deprot
@@ -30,7 +33,7 @@ $ deprot
 +=====================================================================================+
 | request    | 2.88.2  |  24   | F     | RISKY   | package is deprecated              |
 | left-pad   | 1.3.0   |  27   | F     | RISKY   | package is deprecated              |
-| chalk      | 6.0.0   |  79   | B     | CAUTION | 1 release(s) in the last 12 months |
+| chalk      | 6.0.0   |  79   | B     | CAUTION | 1 release in the last 12 months    |
 | lodash     | 4.18.1  |  89   | B     | OK      | healthy                            |
 | express    | 5.2.1   |  96   | A     | OK      | healthy                            |
 | typescript | 7.0.2   |  96   | A     | OK      | healthy                            |
@@ -39,187 +42,134 @@ $ deprot
 6 dependencies analyzed — 2 risky  1 caution  3 ok
 ```
 
----
-
-## Why deprot?
-
-Your `package.json` or `Cargo.toml` is a list of promises made by strangers. Some of those
-strangers stopped showing up years ago; some handed the keys to someone new; some shipped a
-known vulnerability you never heard about. That is **dependency rot**, and after incidents like
-the `xz` backdoor it is nobody's idea of a hypothetical.
-
-Existing answers are mostly cloud SaaS: sign up, connect your repo, upload your dependency graph,
-trust a dashboard. deprot takes the opposite stance:
-
-- **Local-first.** It runs on your machine and talks only to public, read-only data APIs. Your
-  code and your dependency list never leave your computer.
-- **No API keys, ever.** Every data source it uses is free and needs no authentication. There is
-  no account and nothing to pay for.
-- **Explainable.** Every grade comes with the exact signals that produced it (`--explain`). It is
-  never a black-box number you have to take on faith.
-- **One static binary.** No runtime, no services, no config file. `cargo install` and go.
-- **CI-native.** `--json` for machines, `--fail-on` to gate a pull request, and a ready-made
-  GitHub Action.
+No account. No dashboard. No "connect your repo." Your code never leaves your machine — `deprot` only
+makes read-only calls to free, public data APIs.
 
 ## Install
 
 ```bash
-# From source (requires a Rust toolchain)
-cargo install --git https://github.com/LouayeG/deprot deprot --locked
+cargo install deprot
 ```
 
-Or grab a prebuilt binary for your platform from the [Releases](https://github.com/LouayeG/deprot/releases) page.
+<sub>Published on **[crates.io](https://crates.io/crates/deprot)**. Prefer a binary? Grab one from
+[Releases](https://github.com/LouayeG/deprot/releases). Building from source needs a Rust toolchain.</sub>
 
-## Usage
+## 60-second tour
 
 ```bash
-deprot                      # analyze the manifest in the current directory
-deprot path/to/project      # analyze a project directory
-deprot ./package.json       # analyze a specific manifest file
-deprot --tui                # explore results in an interactive terminal UI
-deprot --prod-only          # skip dev / peer / build dependencies
-deprot --explain lodash     # full signal breakdown for matching package(s)
-deprot --json               # stable machine-readable report (for CI / scripting)
-deprot --fail-on risky      # exit non-zero if anything is RISKY (or worse)
-deprot --refresh            # ignore cached facts and refetch
-
-# beyond the basics
-deprot --tree               # resolve the WHOLE tree + blast radius + highest-leverage fix
-deprot --tree --fix         # remediation plan: upgrades that improve your grades
-deprot --deep               # maintainer capture-risk + install-script (code-on-install) detection
-deprot --diff base.lock     # PR mode: risk delta of added/removed/changed deps
-deprot --history express    # a package's release history over time (cadence, gaps, staleness)
-deprot --sarif              # SARIF 2.1.0 for GitHub code scanning
-deprot --sbom               # CycloneDX 1.5 SBOM with risk attached
-deprot --offline            # air-gapped: cache-only, zero network
+deprot                      # grade the project in the current directory
+deprot ./package.json       # or a specific manifest
+deprot --explain lodash     # why did this get that grade? (full breakdown)
+deprot --tui                # explore it all in a slick terminal UI
+deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
 ```
 
-## What sets deprot apart
+## The report card 🎓
 
-Things the cloud incumbents don't do locally — and deprot does, with no keys:
+Every dependency gets a **0–100** score → a letter **grade** → a **verdict**:
 
-- **Transitive tree + blast radius** (`--tree`): scores your *entire* resolved tree at exact
-  locked versions and ranks by how many packages each risky one puts at risk.
-- **Maintainer capture-risk** (`--deep`): flags when a single maintainer controls a large share of
-  your supply chain — the `xz`-style concentration risk.
-- **Install-script detection** (`--deep`): surfaces packages that run code on install.
-- **Typosquat detection**: catches names 1–2 edits from a popular package (offline).
-- **Remediation solver** (`--fix`): the exact upgrades that raise your grades, most impactful first.
-- **Policy-as-code** (`.deprot.toml`): enforce standards with time-boxed waivers.
-- **PR diff** (`--diff`), **release time-machine** (`--history`), **SARIF/SBOM export**, and a fully
-  **air-gapped** mode (`--offline`).
+| Grade | Score | Vibe |
+|:-----:|:-----:|------|
+| **A** | 90–100 | fresh, loved, well-run 🌱 |
+| **B** | 75–89  | perfectly fine 👍 |
+| **C** | 60–74  | keep half an eye on it 👀 |
+| **D** | 40–59  | starting to smell 🧀 |
+| **F** | < 40   | actively rotting 🧟 |
 
-### Supported ecosystems
+Some things are too important to average away — a **deprecation**, an **archived** repo, or an
+**unresolved high/critical CVE** slam the verdict straight to **RISKY**, and `--explain` tells you
+exactly which gremlin did it.
 
-| Ecosystem  | Manifest        | Status |
-|------------|-----------------|--------|
-| npm        | `package.json`  | ✅ supported |
-| crates.io  | `Cargo.toml`    | ✅ supported |
-| PyPI       | `requirements.txt` / `pyproject.toml` | 🚧 planned |
+## The interactive TUI 🖥️
 
-Adding an ecosystem is a matter of implementing one `Manifest` parser — the scoring engine and
-data collector are ecosystem-agnostic.
-
-### `--explain`
-
-```text
-request 2.88.2  —  score 24/100  grade F  [RISKY]
-
-  Forced RISKY because:
-    • package is deprecated
-
-  Signals:
-    deprecation      ░░░░░░░░░░    0%  (w4)  deprecated: request has been deprecated ...
-    vulnerabilities  █████░░░░░   50%  (w3)  1 known advisory(ies); worst GHSA-... (medium)
-    staleness        ░░░░░░░░░░    0%  (w2)  last release 2404 days ago
-    cadence          ░░░░░░░░░░    0%  (w1)  0 release(s) in the last 12 months
-    scorecard        ███░░░░░░░   34%  (w1.5)  OpenSSF Scorecard overall 3.4/10
-    license          ██████████  100%  (w1)  Apache-2.0 (permissive)
-```
-
-## Interactive TUI
-
-`deprot --tui` opens a keyboard-driven terminal UI. A **project-health hero gauge** sits across the
-top; the left column pairs a navigable dependency list with a **grade-distribution chart**; the
-right pane shows the selected package's **big letter grade**, forced-risk reasons, and its signal
-bars (which animate in as you move the selection).
+`deprot --tui` opens a keyboard-driven dashboard: a **project-health gauge** up top, a navigable list
+paired with a **grade-distribution chart**, and a detail pane with a **giant letter grade** + animated
+signal bars for whatever you've selected. It even greets you with a splash. 😎
 
 ```text
 ╭ DEPROT · project health ─────────────────────────────────────────────────────────────────╮
 │█████████████████████ 66/100  ·  grade C  ·  2 risky  0 caution  3 ok                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ╭ dependencies ─────────────────────────╮╭ details ────────────────────────────────────────╮
-│  PACKAGE           SCR  GRD   VERDICT ││███████╗                                         │
-│▍ request            34  F     RISKY   ││██╔════╝   request                               │
-│  left-pad           34  F     RISKY   ││█████╗     2.88.2                                │
-│  chalk              82  B     OK      ││██╔══╝     34/100  [RISKY]                       │
-│  lodash             89  B     OK      ││██║                                              │
-│  express            92  A     OK      ││╚═╝                                              │
-╰───────────────────────────────────────╯│⚠ Forced RISKY because:                          │
-╭ grade distribution ───────────────────╮│• package is deprecated                          │
-│       █████                █████      ││                                                 │
-│█████  █████                █████      ││Signals                                          │
-│██1██  ██2██                ██2██      ││deprecation     ░░░░░░░░░░   0%                  │
-│  A      B      C      D      F        ││vulnerabilities ██████████ 100%                 │
+│▍ request            34  F     RISKY   ││███████╗                                         │
+│  left-pad           34  F     RISKY   ││██╔════╝   request  2.88.2                        │
+│  chalk              82  B     OK      ││█████╗     34/100  [RISKY]                       │
+│  lodash             89  B     OK      ││██╔══╝     ⚠ package is deprecated               │
+│  express            92  A     OK      ││██║        deprecation     ░░░░░░░░░░   0%        │
 ╰───────────────────────────────────────╯╰─────────────────────────────────────────────────╯
- ↑/↓ move · / search · f filter [all] · s sort [tier] · ? help · q quit
+ ↑/↓ move · / search · f filter · s sort · ? help · q quit
 ```
 
-It opens with a brief branded splash. Keys:
+## The party tricks 🎩
 
-| Key | Action |
-|-----|--------|
-| `↑`/`↓` or `j`/`k` | move selection |
-| `g` / `G` | jump to top / bottom |
-| `PgUp` / `PgDn` | scroll the details pane |
-| `/` | search by package name (live filter) |
-| `f` | cycle verdict filter (all → risky → caution+) |
-| `s` | cycle sort (tier → score → name) |
-| `o` | open the package's registry page in your browser |
-| `?` | toggle the help overlay |
-| `q` / `Esc` | quit |
+The stuff cloud tools don't do locally — all free, all keyless:
 
-## How scoring works
+- 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
+  scores every package at its exact locked version, and shows each one's **blast radius** (how many of
+  your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- 🧬 **`--deep` — the xz check.** Flags when **one maintainer controls a scary share** of your supply
+  chain, and which packages **run code on install**.
+- 🩹 **`--tree --fix` — a to-do list, not just bad news.** Computes the exact upgrades that raise your
+  grades, most impactful first, with the command to run.
+- 🕵️ **typosquat radar.** Spots dependencies that are 1–2 keystrokes from a popular package
+  (`lodahs`, `expres`) — a classic attack, caught offline.
+- 🔀 **`--diff base.lock` — PR mode.** "This change adds 3 deps, 1 RISKY, and moves project health −8."
+- ⏳ **`--history express` — a time machine.** A package's release cadence over the years, its longest
+  quiet spell, and how stale it is now.
+- 📜 **policy-as-code** (`.deprot.toml`): enforce a team standard with **time-boxed waivers**.
+- 🔌 **`--sarif` / `--sbom`**: SARIF for GitHub code scanning, CycloneDX SBOM with risk baked in.
+- ✈️ **`--offline`**: fully air-gapped — warm the cache once, then zero network.
 
-Each dependency is reduced to a set of **signals**, each a normalized subscore in `0.0..=1.0`
-with a weight. The final **0–100 value** is the weight-normalized average of whatever signals
-could be computed (a missing data source lowers confidence rather than unfairly tanking a grade).
+## How the grade is computed
 
-| Signal            | Weight | What it measures |
-|-------------------|:------:|------------------|
-| `deprecation`     |   4    | Registry-level deprecation of the package/version |
-| `archived`        |   3    | Upstream source repository is archived (abandoned) |
-| `vulnerabilities` |   3    | Known advisories, driven by the worst CVSS severity |
-| `staleness`       |   2    | Time since the most recent release (fresh < 90d, decays to ~2y) |
-| `scorecard`       |  1.5   | OpenSSF Scorecard — upstream engineering hygiene |
-| `bus_factor`      |  1.5   | Contributor concentration / capture risk (needs a GitHub token) |
-| `cadence`         |   1    | Releases in the trailing 12 months |
-| `license`         |   1    | License present and permissive vs. copyleft vs. missing |
+Each dependency is reduced to a set of **signals**, each a `0.0–1.0` subscore with a weight; the final
+number is their weighted average (a missing data source lowers confidence, it doesn't nuke the grade).
 
-The value maps to a letter grade (**A** ≥ 90, **B** ≥ 75, **C** ≥ 60, **D** ≥ 40, **F** below)
-and a verdict tier (**OK** ≥ 80, **CAUTION** ≥ 55, **RISKY** below).
+| Signal            | Weight | Measures |
+|-------------------|:------:|----------|
+| `deprecation`     |   4    | Registry-level deprecation |
+| `archived`        |   3    | Upstream repo is archived (abandoned) |
+| `vulnerabilities` |   3    | Known advisories (worst CVSS wins) |
+| `staleness`       |   2    | Time since the last release |
+| `scorecard`       |  1.5   | OpenSSF Scorecard (engineering hygiene) |
+| `bus_factor`      |  1.5   | Contributor concentration |
+| `cadence`         |   1    | Releases in the last 12 months |
+| `license`         |   1    | Present & permissive vs. copyleft vs. missing |
 
-**Forced verdicts.** Some facts are too important to be averaged away. A registry deprecation, an
-archived upstream, or an **unresolved high/critical advisory** forces the verdict to **RISKY**
-regardless of the numeric score — and `--explain` tells you which one fired.
+## Where the data comes from (spoiler: no keys)
 
-## Data sources
-
-All free, all public, all read-only. No key required.
-
-| Source | Auth | Used for |
+| Source | Auth | Gives us |
 |--------|:----:|----------|
-| [deps.dev](https://deps.dev) (Google Open Source Insights) | none | releases, licenses, advisories, linked repo, OpenSSF Scorecard |
-| [OSV.dev](https://osv.dev) | none | vulnerability data (via deps.dev advisory records) |
-| npm / crates.io / PyPI registries | none | publish metadata |
-| GitHub API | optional token | deeper repo signals (bus factor, staleness) — never required |
+| [deps.dev](https://deps.dev) | none | releases, licenses, advisories, linked repo, OpenSSF Scorecard |
+| [OSV.dev](https://osv.dev) | none | vulnerabilities (via deps.dev advisories) |
+| npm / crates.io / PyPI | none | publish metadata, maintainers/owners, install scripts |
+| GitHub API | *optional* token | deeper repo signals — never required |
 
-Results are cached on disk (under your OS cache directory) with a 24h TTL, so re-runs are instant
-and friendly to the upstream APIs. Use `--no-cache` or `--refresh` to bypass.
+Results are cached on disk (24h TTL) so re-runs are instant and polite to the APIs.
+
+## Policy as code
+
+Drop a `.deprot.toml` in your repo and `deprot` becomes an enforceable standard that fails CI:
+
+```toml
+# .deprot.toml
+min_score = 60
+max_age_days = 730
+required_scorecard = 4.0
+
+[licenses]
+deny = ["GPL-3.0", "AGPL-3.0"]
+
+[packages]
+deny = ["request", "left-pad"]
+
+[[waivers]]
+package = "lodash"
+reason  = "risk accepted for Q1; migration tracked in JIRA-123"
+until   = "2026-06-01"   # expires — no permanent rug-sweeping
+```
 
 ## Use it in CI
-
-Gate pull requests on dependency health with the bundled GitHub Action:
 
 ```yaml
 # .github/workflows/deps.yml
@@ -232,95 +182,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: LouayeG/deprot@main
         with:
-          fail-on: risky   # ok | caution | risky
+          fail-on: risky
 ```
 
-Or call the binary directly and consume the JSON:
+## How it's built 🧱
+
+A small Cargo workspace with a strict "pure core, I/O at the edges" split — so the whole scoring engine
+is deterministic and testable with **zero network**:
+
+```
+deprot-manifest   parse manifests + lockfiles  ->  Dependency / DepGraph
+deprot-collect    fetch public data            ->  Facts      (the only crate that hits the network)
+deprot-core       Facts                         ->  Score      (pure, zero-I/O, fully deterministic)
+deprot-report     Score                         ->  table / JSON / SARIF / SBOM / --tree
+deprot-policy     Facts + Score                 ->  policy violations (.deprot.toml)
+deprot-tui        Score                         ->  interactive ratatui browser (--tui)
+deprot-cli        wires it all together + owns the CLI
+```
 
 ```bash
-deprot --json > deprot-report.json
-deprot --fail-on caution   # non-zero exit fails the job
-```
-
-## Policy as code
-
-Drop a `.deprot.toml` in your repo to turn deprot into an enforceable team standard. deprot
-auto-discovers it, reports every violation, and exits non-zero so CI fails the build — the thing
-`npm audit` / `cargo audit` can't express. **Waivers are time-boxed**: an exception carries a
-reason and an expiry, after which it stops suppressing the violation.
-
-```toml
-# .deprot.toml
-min_score = 60
-max_age_days = 730
-required_scorecard = 4.0
-
-[licenses]
-deny = ["GPL-3.0", "AGPL-3.0"]
-# allow_only = ["MIT", "Apache-2.0", "ISC"]
-
-[packages]
-deny = ["request", "left-pad"]
-
-[[waivers]]
-package = "lodash"
-reason  = "risk accepted for Q1; migration tracked in JIRA-123"
-until   = "2026-06-01"
-```
-
-Point at a specific file with `--policy path/to/file.toml`, or skip enforcement with `--no-policy`.
-
-## Transitive tree & blast radius
-
-`deprot --tree` resolves your **entire** dependency tree from the lockfile (`Cargo.lock` or
-`package-lock.json`), scores every package at its **exact locked version**, and reports each one's
-**blast radius** — how many of your packages transitively depend on it. It then names the single
-**highest-leverage fix** (risk × reach): the one upgrade or replacement that removes the most risk.
-
-```text
-$ deprot --tree
-… 252 packages in the resolved tree (6 direct) — 31 risky  74 caution  141 ok
-★ highest-leverage fix: upgrade or replace cfg-if — grade C, 42 dependent(s).
-```
-
-## Architecture
-
-deprot is a small Cargo workspace with a strict "pure core, I/O at the edges" split:
-
-```
-deprot-manifest   parse a manifest  ->  Vec<Dependency>
-deprot-collect    fetch public data ->  Facts        (the only crate that touches the network)
-deprot-core       Facts             ->  Score        (pure, zero-I/O, fully deterministic)
-deprot-report     Score             ->  table / JSON / --explain / --tree
-deprot-policy     Facts + Score     ->  policy violations (.deprot.toml)
-deprot-tui        Score             ->  interactive ratatui browser (--tui)
-deprot-cli        wires it together and owns the CLI + exit codes
-```
-
-Because `deprot-core` is pure — it takes an explicit reference time and never reaches for a clock,
-a socket, or the filesystem — the entire scoring model is unit-testable and replayable from
-fixtures. `cargo test --workspace` runs the whole suite offline.
-
-## Building from source
-
-```bash
-git clone https://github.com/LouayeG/deprot
-cd deprot
-cargo build --release        # binary at target/release/deprot
-cargo test --workspace       # run the test suite
-cargo clippy --workspace --all-targets -- -D warnings
+git clone https://github.com/LouayeG/deprot && cd deprot
+cargo build --release      # → target/release/deprot
+cargo test --workspace     # the whole suite runs offline
 ```
 
 ## Roadmap
 
-- PyPI (`requirements.txt` / `pyproject.toml`) adapter
-- Lockfile-aware analysis (score the exact resolved tree, not just the latest version)
-- SARIF output for code-scanning integrations
-- Bus-factor signal via the optional GitHub token
-- An embeddable per-project grade badge
-
-Contributions welcome — new ecosystems are the easiest place to start.
+PyPI adapter · deep tarball capability scanning · bundled offline OSV mirror · SBOM ingest · a grade
+badge you can embed in your own README. PRs welcome — new ecosystems are the easiest place to start.
 
 ## License
 
-Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE) at your option.
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), your choice.
+
+<div align="center"><sub>made with 🦀 and mild paranoia by <b>LouayeG</b></sub></div>
