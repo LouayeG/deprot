@@ -9,10 +9,12 @@
 
 mod cache;
 mod depsdev;
+mod registry;
 
 use chrono::Utc;
 use deprot_core::{DepGraph, Dependency, Ecosystem, Facts};
 use futures::stream::{self, StreamExt};
+use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,6 +29,9 @@ pub struct CollectorConfig {
     pub cache_ttl_secs: u64,
     /// Whether the on-disk cache is used at all.
     pub cache_enabled: bool,
+    /// Whether to enrich facts with registry data (maintainers + install scripts). Off by default
+    /// because it adds a request per package.
+    pub enrich: bool,
 }
 
 impl Default for CollectorConfig {
@@ -35,6 +40,7 @@ impl Default for CollectorConfig {
             concurrency: 12,
             cache_ttl_secs: 24 * 60 * 60,
             cache_enabled: true,
+            enrich: false,
         }
     }
 }
@@ -53,6 +59,7 @@ pub struct Collected {
 /// Collects facts for dependencies from public data sources.
 pub struct Collector {
     depsdev: depsdev::DepsDev,
+    http: Client,
     cache: Arc<Cache>,
     config: CollectorConfig,
 }
@@ -61,12 +68,17 @@ impl Collector {
     /// Build a collector with the given config.
     pub fn new(config: CollectorConfig) -> anyhow::Result<Self> {
         let http = reqwest::Client::builder()
-            .user_agent(concat!("deprot/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!(
+                "deprot/",
+                env!("CARGO_PKG_VERSION"),
+                " (+https://github.com/LouayeG/deprot)"
+            ))
             .timeout(Duration::from_secs(20))
             .build()?;
         let cache = Cache::open(config.cache_ttl_secs, config.cache_enabled);
         Ok(Collector {
-            depsdev: depsdev::DepsDev::new(http),
+            depsdev: depsdev::DepsDev::new(http.clone()),
+            http,
             cache: Arc::new(cache),
             config,
         })
@@ -81,15 +93,22 @@ impl Collector {
         pin: Option<&str>,
     ) -> (Facts, Option<String>) {
         let system = system_for(ecosystem);
-        let ckey = match pin {
-            Some(v) => cache::key(system, &format!("{name}@{v}")),
-            None => cache::key(system, name),
+        // Enriched facts are a superset, so they get a distinct cache namespace.
+        let suffix = if self.config.enrich { "+deep" } else { "" };
+        let base = match pin {
+            Some(v) => format!("{name}@{v}{suffix}"),
+            None => format!("{name}{suffix}"),
         };
+        let ckey = cache::key(system, &base);
         if let Some(facts) = self.cache.get(&ckey) {
             return (facts, None);
         }
         match self.depsdev.collect(system, name, pin, Utc::now()).await {
-            Ok(facts) => {
+            Ok(mut facts) => {
+                if self.config.enrich {
+                    // Registry enrichment is best-effort; failures leave facts as-is.
+                    let _ = registry::enrich(&self.http, ecosystem, name, &mut facts).await;
+                }
                 self.cache.put(&ckey, &facts);
                 (facts, None)
             }

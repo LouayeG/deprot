@@ -121,4 +121,10 @@ pub struct Facts {
     /// Fraction (0.0–1.0) of recent commits authored by the single most active contributor.
     /// High concentration = high bus-factor / capture risk. Optional (needs a GitHub token).
     pub top_contributor_share: Option<f64>,
+    /// Registry maintainer/owner identities (email or login). Populated only in `--deep` mode.
+    #[serde(default)]
+    pub maintainers: Vec<String>,
+    /// The package runs an install/pre/post-install script (npm) — a code-execution vector.
+    #[serde(default)]
+    pub has_install_script: bool,
 }

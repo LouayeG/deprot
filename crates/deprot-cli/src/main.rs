@@ -65,6 +65,12 @@ struct Cli {
     #[arg(long, value_name = "TIER")]
     fail_on: Option<String>,
 
+    /// Deep supply-chain analysis: also fetch maintainer identities and install scripts, then
+    /// report maintainer capture-risk (concentration) and code-on-install packages. Adds one
+    /// registry request per dependency.
+    #[arg(long)]
+    deep: bool,
+
     /// Only analyze direct (production) dependencies, skipping dev/peer deps.
     #[arg(long)]
     prod_only: bool,
@@ -149,6 +155,7 @@ async fn run() -> Result<()> {
             DEFAULT_CACHE_TTL_SECS
         },
         cache_enabled: !cli.no_cache,
+        enrich: cli.deep,
     };
     let collector = Collector::new(config)?;
     let collected = collector.collect_all(&deps).await;
@@ -218,6 +225,11 @@ async fn run() -> Result<()> {
                 );
             }
         }
+    }
+
+    // 4c. Deep supply-chain analysis (maintainer capture-risk + install scripts).
+    if cli.deep && !cli.json && !cli.sarif && !cli.sbom {
+        print_deep(&rows, &facts);
     }
 
     // 5. Policy evaluation (`.deprot.toml`), if present.
@@ -294,6 +306,7 @@ async fn run_diff(cli: &Cli, baseline: &std::path::Path, fail_on: Option<Tier>) 
             DEFAULT_CACHE_TTL_SECS
         },
         cache_enabled: !cli.no_cache,
+        enrich: false,
     };
     let collector = Collector::new(config)?;
 
@@ -371,6 +384,57 @@ async fn run_diff(cli: &Cli, baseline: &std::path::Path, fail_on: Option<Tier>) 
     Ok(())
 }
 
+/// Print the deep-analysis section: install-script (code-on-install) packages and maintainer
+/// capture-risk concentration across the analyzed set.
+fn print_deep(rows: &[Row], facts: &[deprot_core::Facts]) {
+    // #4 — install scripts.
+    let with_scripts: Vec<&str> = rows
+        .iter()
+        .zip(facts)
+        .filter(|(_, f)| f.has_install_script)
+        .map(|(r, _)| r.dependency.name.as_str())
+        .collect();
+    if !with_scripts.is_empty() {
+        eprintln!();
+        eprintln!(
+            "{} {} package(s) run code on install (pre/post-install scripts):",
+            "⚠".yellow().bold(),
+            with_scripts.len()
+        );
+        for name in &with_scripts {
+            eprintln!("  {} {}", "•".yellow(), name.bold());
+        }
+    }
+
+    // #1 — maintainer capture-risk.
+    let entries: Vec<(&str, &[String])> = rows
+        .iter()
+        .zip(facts)
+        .map(|(r, f)| (r.dependency.name.as_str(), f.maintainers.as_slice()))
+        .collect();
+    let reaches = deprot_core::capture_risk(entries.iter().map(|(n, m)| (*n, *m)));
+    let total = rows.len();
+    let top = deprot_core::top_share(&reaches, total);
+    let concentrated: Vec<_> = reaches.iter().filter(|r| r.count() > 1).take(8).collect();
+    if !concentrated.is_empty() {
+        eprintln!();
+        eprintln!(
+            "{} maintainer capture-risk — top identity controls {:.0}% of your dependencies:",
+            "⚠".yellow().bold(),
+            top * 100.0
+        );
+        for r in concentrated {
+            eprintln!(
+                "  {} {} — {} package(s): {}",
+                "•".yellow(),
+                r.identity.bold(),
+                r.count(),
+                r.packages.join(", ")
+            );
+        }
+    }
+}
+
 /// Print policy violations to stderr (so JSON stdout stays clean), grouped and colored.
 fn print_violations(violations: &[deprot_policy::Violation]) {
     if violations.is_empty() {
@@ -419,6 +483,7 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
             DEFAULT_CACHE_TTL_SECS
         },
         cache_enabled: !cli.no_cache,
+        enrich: false,
     };
     let collector = Collector::new(config)?;
     let gfacts = collector.collect_graph(&resolved.graph).await;
