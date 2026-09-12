@@ -13,8 +13,10 @@ mod facts;
 mod graph;
 mod score;
 mod signals;
+mod typosquat;
 
 pub use facts::{Dependency, Ecosystem, Facts, Vuln};
 pub use graph::{DepGraph, DepNode};
 pub use score::{score, Grade, Score, Tier};
 pub use signals::Signal;
+pub use typosquat::{scan as typosquat_scan, Suspect};

@@ -200,6 +200,26 @@ async fn run() -> Result<()> {
         println!("{}", summary_banner(&rows));
     }
 
+    // 4b. Typosquat / dependency-confusion warnings (pure, offline).
+    if !cli.json && !cli.sarif && !cli.sbom {
+        let names: Vec<&str> = rows.iter().map(|r| r.dependency.name.as_str()).collect();
+        let eco = detected.ecosystem;
+        let suspects = deprot_core::typosquat_scan(names, eco);
+        if !suspects.is_empty() {
+            eprintln!();
+            eprintln!("{} possible typosquat(s):", "⚠".yellow().bold());
+            for s in &suspects {
+                eprintln!(
+                    "  {} {} looks like {} ({} edit(s) away) — verify it's the package you intend",
+                    "•".yellow(),
+                    s.name.bold(),
+                    s.nearest.bold(),
+                    s.distance
+                );
+            }
+        }
+    }
+
     // 5. Policy evaluation (`.deprot.toml`), if present.
     let policy_dir = detected
         .path
