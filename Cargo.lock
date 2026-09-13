@@ -435,6 +435,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "deprot-hygiene"
+version = "0.5.0"
+dependencies = [
+ "deprot-core",
+ "serde",
+]
+
+[[package]]
 name = "deprot-manifest"
 version = "0.5.0"
 dependencies = [

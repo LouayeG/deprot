@@ -4,6 +4,7 @@ members = [
     "crates/deprot-core",
     "crates/deprot-secrets",
     "crates/deprot-actions",
+    "crates/deprot-hygiene",
     "crates/deprot-manifest",
     "crates/deprot-collect",
     "crates/deprot-report",
@@ -28,6 +29,7 @@ categories = ["command-line-utilities", "development-tools"]
 deprot-core = { path = "crates/deprot-core", version = "0.5.0" }
 deprot-secrets = { path = "crates/deprot-secrets", version = "0.5.0" }
 deprot-actions = { path = "crates/deprot-actions", version = "0.5.0" }
+deprot-hygiene = { path = "crates/deprot-hygiene", version = "0.5.0" }
 deprot-manifest = { path = "crates/deprot-manifest", version = "0.5.0" }
 deprot-collect = { path = "crates/deprot-collect", version = "0.5.0" }
 deprot-report = { path = "crates/deprot-report", version = "0.5.0" }
