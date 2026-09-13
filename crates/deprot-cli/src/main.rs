@@ -36,6 +36,17 @@ struct Cli {
     #[arg(long)]
     tree: bool,
 
+    /// Analyze the packages actually installed on disk — the project's node_modules and the active
+    /// Python environment — at their exact installed versions, instead of the manifest. Catches
+    /// drift from the lockfile and packages installed by hand.
+    #[arg(long)]
+    installed: bool,
+
+    /// Also scan machine-wide installs: the global npm root (`npm root -g`) and pipx. Combine with
+    /// --installed, or use alone to audit only global tooling.
+    #[arg(long)]
+    global: bool,
+
     /// Compare the target against a baseline lockfile (PR mode): show added/removed/changed
     /// dependencies and the net change in project risk.
     #[arg(long, value_name = "BASELINE")]
@@ -137,6 +148,11 @@ async fn run() -> Result<()> {
     // Diff mode compares two lockfiles.
     if let Some(baseline) = cli.diff.clone() {
         return run_diff(&cli, &baseline, fail_on).await;
+    }
+
+    // Installed mode analyzes the packages actually present on disk.
+    if cli.installed || cli.global {
+        return run_installed(&cli, fail_on).await;
     }
 
     // Transitive-tree mode analyzes the resolved lockfile instead of the manifest.
@@ -593,6 +609,47 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         resolved.path.display(),
     );
 
+    analyze_graph(cli, &resolved.graph, fail_on).await
+}
+
+/// Installed mode: scan packages present on disk (node_modules + the active Python environment, and
+/// with `--global` the global npm root + pipx) and analyze them at their exact installed versions
+/// through the same resolved-graph pipeline as `--tree`.
+async fn run_installed(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
+    let opts = deprot_manifest::InstalledOptions {
+        local: cli.installed,
+        global: cli.global,
+    };
+    let scan = deprot_manifest::scan_installed(&cli.path, opts)
+        .with_context(|| format!("scanning installed packages under {}", cli.path.display()))?;
+
+    if scan.graph.is_empty() {
+        return Err(anyhow!(
+            "no installed packages found (looked in {}/node_modules and the active Python environment{}) \
+             — is anything installed?",
+            cli.path.display(),
+            if cli.global { ", plus global npm/pipx" } else { "" }
+        ));
+    }
+
+    eprintln!(
+        "{} {} {} installed packages [{}] ...",
+        "deprot".bold(),
+        "analyzing".dimmed(),
+        scan.graph.len(),
+        scan.sources.join(", "),
+    );
+
+    analyze_graph(cli, &scan.graph, fail_on).await
+}
+
+/// Shared resolved-graph analysis for `--tree` and `--installed`: collect facts at each node's exact
+/// version, score, render the tree table/JSON, optionally print a fix plan, and apply the CI gate.
+async fn analyze_graph(
+    cli: &Cli,
+    graph: &deprot_core::DepGraph,
+    fail_on: Option<Tier>,
+) -> Result<()> {
     let config = CollectorConfig {
         concurrency: cli.concurrency.max(1),
         cache_ttl_secs: if cli.refresh {
@@ -605,14 +662,14 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         offline: cli.offline,
     };
     let collector = Collector::new(config)?;
-    let gfacts = collector.collect_graph(&resolved.graph).await;
-    let radii = resolved.graph.blast_radii();
+    let gfacts = collector.collect_graph(graph).await;
+    let radii = graph.blast_radii();
     let now = Utc::now();
 
     let rows: Vec<TreeRow> = gfacts
         .into_iter()
         .map(|gf| {
-            let node = &resolved.graph.nodes()[gf.index];
+            let node = &graph.nodes()[gf.index];
             TreeRow {
                 name: node.name.clone(),
                 version: node.version.clone(),

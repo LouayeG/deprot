@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// A package ecosystem. New ecosystems are added here and wired up with a manifest + collector
 /// adapter; the scoring engine does not change.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Ecosystem {
     Npm,

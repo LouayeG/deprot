@@ -10,10 +10,12 @@ use deprot_core::{Dependency, Ecosystem};
 use std::path::{Path, PathBuf};
 
 mod cargo;
+mod installed;
 mod lockfile;
 mod npm;
 
 pub use cargo::CargoManifest;
+pub use installed::{scan_installed, InstalledOptions, InstalledScan};
 pub use lockfile::{detect_lockfile, ResolvedGraph};
 pub use npm::NpmManifest;
 

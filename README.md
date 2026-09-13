@@ -100,6 +100,11 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- 📦 **`--installed` — grade what's *actually on disk*.** Scans the real install — your `node_modules`
+  and the active Python environment (`importlib.metadata`, no lockfile needed) — at the exact versions
+  present, so it catches **drift from the lockfile** and packages installed by hand. Add **`--global`**
+  to audit machine-wide tooling (`npm root -g`, `pipx`). Runs through the same blast-radius / `--fix` /
+  `--fail-on` pipeline as `--tree`.
 - 🧬 **`--deep` — the xz check.** Flags when **one maintainer controls a scary share** of your supply
   chain, and which packages **run code on install**.
 - 🩹 **`--tree --fix` — a to-do list, not just bad news.** Computes the exact upgrades that raise your
