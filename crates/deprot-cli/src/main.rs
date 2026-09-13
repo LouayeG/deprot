@@ -181,6 +181,7 @@ async fn run() -> Result<()> {
 
     if deps.is_empty() {
         eprintln!("no dependencies found in {}", detected.path.display());
+        hint_multi_package(&cli.path, &detected.path);
         return Ok(());
     }
 
@@ -311,6 +312,42 @@ async fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// When a single-manifest analysis comes up empty but the directory holds manifests in
+/// subdirectories, point the user at `--recursive` instead of leaving them at a dead end.
+fn hint_multi_package(target: &std::path::Path, already: &std::path::Path) {
+    if !target.is_dir() {
+        return;
+    }
+    let others: Vec<String> =
+        deprot_manifest::discover(target, deprot_manifest::DEFAULT_DISCOVER_DEPTH)
+            .into_iter()
+            .filter(|m| m != already)
+            .map(|m| m.strip_prefix(target).unwrap_or(&m).display().to_string())
+            .collect();
+    if others.is_empty() {
+        return;
+    }
+    let shown = others
+        .iter()
+        .take(5)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let more = if others.len() > 5 {
+        format!(" (+{} more)", others.len() - 5)
+    } else {
+        String::new()
+    };
+    eprintln!(
+        "{} found manifest(s) in subdirectories: {shown}{more}",
+        "hint:".cyan().bold()
+    );
+    eprintln!(
+        "      this looks like a multi-package repo — run {} to analyze them all.",
+        format!("deprot --recursive {}", target.display()).bold()
+    );
 }
 
 /// Build a collector from the CLI's cache/offline/concurrency flags.
@@ -724,6 +761,7 @@ async fn run_tree(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         .with_context(|| format!("resolving lockfile at {}", cli.path.display()))?;
     if resolved.graph.is_empty() {
         eprintln!("no dependencies in {}", resolved.path.display());
+        hint_multi_package(&cli.path, &resolved.path);
         return Ok(());
     }
 
