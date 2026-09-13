@@ -16,6 +16,7 @@ pub enum Ecosystem {
     Npm,
     Cargo,
     PyPI,
+    Go,
 }
 
 impl Ecosystem {
@@ -25,6 +26,7 @@ impl Ecosystem {
             Ecosystem::Npm => "npm",
             Ecosystem::Cargo => "cargo",
             Ecosystem::PyPI => "pypi",
+            Ecosystem::Go => "go",
         }
     }
 
@@ -34,6 +36,7 @@ impl Ecosystem {
             Ecosystem::Npm => "npm",
             Ecosystem::Cargo => "crates.io",
             Ecosystem::PyPI => "PyPI",
+            Ecosystem::Go => "Go",
         }
     }
 }

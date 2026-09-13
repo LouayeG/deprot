@@ -153,6 +153,7 @@ fn registry_url(dep: &Dependency) -> String {
         Ecosystem::Npm => format!("https://www.npmjs.com/package/{}", dep.name),
         Ecosystem::Cargo => format!("https://crates.io/crates/{}", dep.name),
         Ecosystem::PyPI => format!("https://pypi.org/project/{}/", dep.name),
+        Ecosystem::Go => format!("https://pkg.go.dev/{}", dep.name),
     }
 }
 

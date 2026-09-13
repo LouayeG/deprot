@@ -19,6 +19,7 @@ pub async fn enrich(
         Ecosystem::Npm => enrich_npm(http, name, facts).await,
         Ecosystem::Cargo => enrich_crates(http, name, facts).await,
         Ecosystem::PyPI => Ok(()), // PyPI maintainer data requires auth; skipped for now.
+        Ecosystem::Go => Ok(()),   // Go has no per-package maintainer registry to enrich from.
     }
 }
 

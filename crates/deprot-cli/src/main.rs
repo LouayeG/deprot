@@ -747,6 +747,7 @@ async fn print_fix_plan(collector: &Collector, rows: &[TreeRow], now: chrono::Da
                 deprot_core::Ecosystem::PyPI => {
                     format!("pip install -U {}=={}", r.name, latest_ver)
                 }
+                deprot_core::Ecosystem::Go => format!("go get {}@{}", r.name, latest_ver),
             };
             plan.push(format!(
                 "  {} {} {} → {}  (grade {}→{})   {}",

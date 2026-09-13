@@ -113,11 +113,33 @@ const POPULAR_PYPI: &[&str] = &[
     "cryptography",
 ];
 
+/// Popular Go modules (abbreviated but representative).
+const POPULAR_GO: &[&str] = &[
+    "github.com/gin-gonic/gin",
+    "github.com/gorilla/mux",
+    "github.com/stretchr/testify",
+    "github.com/spf13/cobra",
+    "github.com/spf13/viper",
+    "github.com/sirupsen/logrus",
+    "github.com/pkg/errors",
+    "github.com/google/uuid",
+    "github.com/prometheus/client_golang",
+    "github.com/aws/aws-sdk-go",
+    "golang.org/x/crypto",
+    "golang.org/x/net",
+    "golang.org/x/sys",
+    "google.golang.org/grpc",
+    "google.golang.org/protobuf",
+    "go.uber.org/zap",
+    "gorm.io/gorm",
+];
+
 fn popular_for(eco: Ecosystem) -> &'static [&'static str] {
     match eco {
         Ecosystem::Npm => POPULAR_NPM,
         Ecosystem::Cargo => POPULAR_CARGO,
         Ecosystem::PyPI => POPULAR_PYPI,
+        Ecosystem::Go => POPULAR_GO,
     }
 }
 

@@ -48,5 +48,6 @@ fn purl(r: &Row) -> String {
         Ecosystem::Npm => format!("pkg:npm/{}@{}", r.dependency.name, v),
         Ecosystem::Cargo => format!("pkg:cargo/{}@{}", r.dependency.name, v),
         Ecosystem::PyPI => format!("pkg:pypi/{}@{}", r.dependency.name, v),
+        Ecosystem::Go => format!("pkg:golang/{}@{}", r.dependency.name, v),
     }
 }
