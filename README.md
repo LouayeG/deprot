@@ -61,6 +61,7 @@ cargo install deprot
 deprot                      # grade the project in the current directory
 deprot ./package.json       # or a specific manifest
 deprot --recursive          # monorepo? grade every subproject (npm + Cargo + Go)
+deprot --vulns              # vuln-first: every CVE, its severity, and the fix version
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -101,6 +102,10 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- 🛡️ **`--vulns` — vuln-first CVE audit.** Every known advisory across your resolved tree, worst-first:
+  **CVE id, CVSS, and the exact version to upgrade to.** Vulnerability data is **OSV.dev merged with
+  GitHub/deps.dev advisories** (a superset of either alone), with CVSS scored from the raw vector.
+  `--json` for CI, `--sarif` for per-CVE GitHub code-scanning alerts; exits non-zero if anything's found.
 - 🗂️ **`--recursive` — monorepo mode.** One repo, many subprojects: a `frontend/` (`package.json`), a
   `backend/` (`go.mod`), `packages/*` (`Cargo.toml`)… deprot discovers **every** manifest under the
   directory, grades each in its own section, and fails CI on the worst verdict across all of them.
@@ -145,7 +150,7 @@ number is their weighted average (a missing data source lowers confidence, it do
 | Source | Auth | Gives us |
 |--------|:----:|----------|
 | [deps.dev](https://deps.dev) | none | releases, licenses, advisories, linked repo, OpenSSF Scorecard |
-| [OSV.dev](https://osv.dev) | none | vulnerabilities (via deps.dev advisories) |
+| [OSV.dev](https://osv.dev) | none | vulnerabilities — CVE aliases, CVSS vectors, fixed versions (merged with deps.dev/GitHub advisories) |
 | npm / crates.io / PyPI / Go | none | publish metadata, maintainers/owners, install scripts |
 | GitHub API | *optional* token | deeper repo signals — never required |
 
