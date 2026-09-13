@@ -82,10 +82,49 @@ fn now_secs() -> u64 {
 }
 
 /// Build a filesystem-safe cache key from ecosystem + package name.
+///
+/// A readable, sanitized prefix is kept for debuggability, but the key is disambiguated with a
+/// stable hash of the *raw* name. Sanitizing alone is lossy — distinct packages collapse to the
+/// same string (`@scope/pkg`, `scope-pkg` and `scope.pkg` all become `_scope_pkg`), which for npm
+/// (where those are different packages) would serve one package's cached facts for another.
 pub fn key(system: &str, name: &str) -> String {
     let safe: String = name
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .take(60)
         .collect();
-    format!("{system}__{safe}")
+    format!("{system}__{safe}_{:016x}", fnv1a(name))
+}
+
+/// FNV-1a 64-bit: a tiny, dependency-free hash that is stable across runs and Rust releases.
+/// (`std`'s `DefaultHasher` is unsuitable here because its output may change between Rust versions,
+/// which would silently orphan every persisted cache entry.)
+fn fnv1a(s: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+#[cfg(test)]
+mod tests {
+    use super::key;
+
+    #[test]
+    fn distinct_names_do_not_collide() {
+        // These all sanitize to the same lossy string but are different npm packages.
+        let a = key("npm", "@scope/pkg");
+        let b = key("npm", "scope-pkg");
+        let c = key("npm", "scope.pkg");
+        assert_ne!(a, b);
+        assert_ne!(b, c);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn key_is_stable() {
+        assert_eq!(key("cargo", "serde@1.0.0"), key("cargo", "serde@1.0.0"));
+    }
 }
