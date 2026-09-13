@@ -400,6 +400,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deprot-actions"
+version = "0.4.0"
+dependencies = [
+ "deprot-core",
+ "regex",
+ "serde",
+]
+
+[[package]]
 name = "deprot-collect"
 version = "0.4.0"
 dependencies = [
