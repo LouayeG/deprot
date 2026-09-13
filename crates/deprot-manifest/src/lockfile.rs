@@ -188,6 +188,8 @@ fn parse_cargo_lock(contents: &str, direct: BTreeSet<String>) -> Result<DepGraph
 
 #[derive(Deserialize)]
 struct NpmLock {
+    #[serde(rename = "lockfileVersion", default)]
+    lockfile_version: u32,
     #[serde(default)]
     packages: BTreeMap<String, NpmPackage>,
 }
@@ -212,6 +214,18 @@ struct NpmPackage {
 /// blast-radius counting.
 fn parse_npm_lock(contents: &str) -> Result<DepGraph> {
     let lock: NpmLock = serde_json::from_str(contents)?;
+
+    // v1 lockfiles have no `packages` map, so they'd parse into an empty graph and silently report
+    // "no dependencies". Fail loudly with an actionable message instead. (An empty v2/v3 lockfile —
+    // a project with zero dependencies — is legitimate and still returns an empty graph.)
+    if lock.packages.is_empty() && lock.lockfile_version < 2 {
+        return Err(anyhow!(
+            "package-lock.json lockfileVersion {} is unsupported (deprot needs v2 or v3); \
+             regenerate it with npm 7+ via `rm package-lock.json && npm install`",
+            lock.lockfile_version
+        ));
+    }
+
     let mut graph = DepGraph::new();
 
     // Direct deps = the root entry's dependency maps.
@@ -318,5 +332,22 @@ mod tests {
         assert!(g.nodes()[idx("express")].direct);
         assert!(!g.nodes()[idx("accepts")].direct);
         assert_eq!(g.blast_radii()[idx("accepts")], 1);
+    }
+
+    #[test]
+    fn npm_lockfile_v1_is_rejected() {
+        let lock = r#"{
+            "lockfileVersion": 1,
+            "dependencies": { "express": { "version": "4.18.2" } }
+        }"#;
+        let err = parse_npm_lock(lock).unwrap_err().to_string();
+        assert!(err.contains("lockfileVersion 1"), "{err}");
+    }
+
+    #[test]
+    fn empty_v3_lockfile_is_ok() {
+        let lock = r#"{ "lockfileVersion": 3, "packages": {} }"#;
+        let g = parse_npm_lock(lock).unwrap();
+        assert!(g.is_empty());
     }
 }
