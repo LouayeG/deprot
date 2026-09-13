@@ -45,8 +45,25 @@ struct Report {
     dependencies: Vec<RowOut>,
 }
 
-/// Serialize scored rows into the stable deprot JSON report (pretty-printed).
-pub fn to_json(rows: &[Row]) -> String {
+#[derive(Serialize)]
+struct PackageReport {
+    /// The manifest this package's dependencies came from (e.g. `frontend/package.json`).
+    source: String,
+    ecosystem: String,
+    summary: Summary,
+    dependencies: Vec<RowOut>,
+}
+
+#[derive(Serialize)]
+struct MultiReport {
+    tool: &'static str,
+    version: &'static str,
+    summary: Summary,
+    packages: Vec<PackageReport>,
+}
+
+/// Tally tier counts and map each row to its serializable form.
+fn body(rows: &[Row]) -> (Summary, Vec<RowOut>) {
     let mut summary = Summary {
         total: rows.len(),
         ok: 0,
@@ -86,12 +103,52 @@ pub fn to_json(rows: &[Row]) -> String {
             }
         })
         .collect();
+    (summary, deps)
+}
 
+/// Serialize scored rows into the stable deprot JSON report (pretty-printed).
+pub fn to_json(rows: &[Row]) -> String {
+    let (summary, dependencies) = body(rows);
     let report = Report {
         tool: "deprot",
         version: env!("CARGO_PKG_VERSION"),
         summary,
-        dependencies: deps,
+        dependencies,
+    };
+    serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
+}
+
+/// Serialize a multi-package (monorepo) analysis: one section per discovered manifest, plus a
+/// project-wide summary. Each package is `(source_label, ecosystem_label, rows)`.
+pub fn to_json_packages(packages: &[(String, String, Vec<Row>)]) -> String {
+    let mut total = Summary {
+        total: 0,
+        ok: 0,
+        caution: 0,
+        risky: 0,
+    };
+    let pkgs: Vec<PackageReport> = packages
+        .iter()
+        .map(|(source, ecosystem, rows)| {
+            let (summary, dependencies) = body(rows);
+            total.total += summary.total;
+            total.ok += summary.ok;
+            total.caution += summary.caution;
+            total.risky += summary.risky;
+            PackageReport {
+                source: source.clone(),
+                ecosystem: ecosystem.clone(),
+                summary,
+                dependencies,
+            }
+        })
+        .collect();
+
+    let report = MultiReport {
+        tool: "deprot",
+        version: env!("CARGO_PKG_VERSION"),
+        summary: total,
+        packages: pkgs,
     };
     serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
 }

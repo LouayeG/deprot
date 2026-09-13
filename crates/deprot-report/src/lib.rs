@@ -17,7 +17,7 @@ mod tree;
 use deprot_core::{Dependency, Score};
 
 pub use explain::explain;
-pub use json::to_json;
+pub use json::{to_json, to_json_packages};
 pub use sarif::to_sarif;
 pub use sbom::to_cyclonedx;
 pub use terminal::{summary_banner, table};
