@@ -14,6 +14,7 @@ categories.workspace = true
 deprot-core = { workspace = true }
 deprot-secrets = { workspace = true }
 deprot-actions = { workspace = true }
+deprot-hygiene = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 owo-colors = { workspace = true }

@@ -9,6 +9,7 @@
 
 mod actions;
 mod explain;
+mod hygiene;
 mod json;
 mod sarif;
 mod sbom;
@@ -21,6 +22,7 @@ use deprot_core::{Dependency, Score};
 
 pub use actions::{workflow_json, workflow_sarif, workflow_summary, workflow_table};
 pub use explain::explain;
+pub use hygiene::{hygiene_json, hygiene_summary, hygiene_table};
 pub use json::{to_json, to_json_packages};
 pub use sarif::to_sarif;
 pub use sbom::to_cyclonedx;

@@ -471,6 +471,7 @@ dependencies = [
  "comfy-table",
  "deprot-actions",
  "deprot-core",
+ "deprot-hygiene",
  "deprot-secrets",
  "owo-colors",
  "serde",
