@@ -451,6 +451,7 @@ version = "0.3.0"
 dependencies = [
  "comfy-table",
  "deprot-core",
+ "deprot-secrets",
  "owo-colors",
  "serde",
  "serde_json",
