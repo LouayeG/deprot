@@ -9,6 +9,7 @@
 
 mod cache;
 mod depsdev;
+mod osv;
 mod registry;
 
 use chrono::Utc;
@@ -115,6 +116,9 @@ impl Collector {
         }
         match self.depsdev.collect(system, name, pin, Utc::now()).await {
             Ok(mut facts) => {
+                // OSV is the primary vulnerability source (per-CVE aliases + fixed versions),
+                // merged with any advisory deps.dev already found. Best-effort.
+                osv::merge(&self.http, ecosystem, name, &mut facts).await;
                 if self.config.enrich {
                     // Registry enrichment is best-effort; failures leave facts as-is.
                     let _ = registry::enrich(&self.http, ecosystem, name, &mut facts).await;
