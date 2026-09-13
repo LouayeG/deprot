@@ -271,11 +271,8 @@ fn is_placeholder(v: &str) -> bool {
 fn redact(v: &str) -> String {
     let chars: Vec<char> = v.chars().collect();
     if chars.len() <= 10 {
-        return format!(
-            "{}{}",
-            &chars.first().map(|c| c.to_string()).unwrap_or_default(),
-            "*".repeat(chars.len().saturating_sub(1))
-        );
+        let head = chars.first().map(|c| c.to_string()).unwrap_or_default();
+        return format!("{head}{}", "*".repeat(chars.len().saturating_sub(1)));
     }
     let head: String = chars[..4].iter().collect();
     let tail: String = chars[chars.len() - 4..].iter().collect();

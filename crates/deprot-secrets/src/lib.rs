@@ -8,5 +8,7 @@
 //! ([`scan_path`]) is the only part that touches disk.
 
 mod detect;
+mod walk;
 
 pub use detect::{scan_content, SecretFinding};
+pub use walk::scan_path;
