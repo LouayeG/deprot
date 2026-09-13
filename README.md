@@ -62,6 +62,7 @@ deprot                      # grade the project in the current directory
 deprot ./package.json       # or a specific manifest
 deprot --recursive          # monorepo? grade every subproject (npm + Cargo + Go)
 deprot --vulns              # vuln-first: every CVE, its severity, and the fix version
+deprot --secrets            # scan your own source for leaked API keys / tokens / private keys
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -102,6 +103,11 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- 🔑 **`--secrets` — catch leaked credentials before they ship.** Scans your *own* source for
+  hardcoded API keys, tokens, and private keys with high-precision format rules **plus entropy
+  analysis**, and aggressive false-positive suppression (placeholders, `${ENV}` refs, doc/example
+  keys, `node_modules`). Every match is **redacted** in output; inline `deprot:allow-secret` suppresses
+  a line. `--json` for CI, `--sarif` for per-line GitHub code-scanning alerts.
 - 🛡️ **`--vulns` — vuln-first CVE audit.** Every known advisory across your resolved tree, worst-first:
   **CVE id, CVSS, and the exact version to upgrade to.** Vulnerability data is **OSV.dev merged with
   GitHub/deps.dev advisories** (a superset of either alone), with CVSS scored from the raw vector.
