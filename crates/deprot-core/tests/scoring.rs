@@ -97,7 +97,12 @@ fn stale_package_scores_low() {
 fn no_data_is_flagged_not_healthy() {
     let facts = Facts::default();
     let s = score(&facts, now());
-    assert_eq!(s.tier, Tier::Risky, "unresolved package must not pass, got {}", s.value);
+    assert_eq!(
+        s.tier,
+        Tier::Risky,
+        "unresolved package must not pass, got {}",
+        s.value
+    );
     assert!(s
         .forced_reasons
         .iter()

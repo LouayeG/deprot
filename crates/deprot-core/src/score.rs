@@ -125,8 +125,9 @@ pub fn score(facts: &Facts, now: DateTime<Utc>) -> Score {
     // Force RISKY with an explicit reason so a CI gate (`--fail-on risky`) surfaces it instead of
     // the remaining default signals averaging into a reassuring grade.
     if facts.is_unresolved() {
-        forced_reasons
-            .push("no registry data — package unknown or lookup failed; risk not assessable".to_string());
+        forced_reasons.push(
+            "no registry data — package unknown or lookup failed; risk not assessable".to_string(),
+        );
     }
     if facts.deprecated {
         forced_reasons.push("package is deprecated".to_string());

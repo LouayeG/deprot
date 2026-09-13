@@ -422,7 +422,10 @@ mod tests {
         // Filtering to risky-only drops the healthy selection, moving the highlight to "bad".
         app.cycle_filter();
         assert_eq!(app.current().unwrap().dependency.name, "bad");
-        assert_eq!(app.detail_scroll, 0, "detail scroll must reset on selection change");
+        assert_eq!(
+            app.detail_scroll, 0,
+            "detail scroll must reset on selection change"
+        );
         assert!(app.selection_generation > gen, "animation must re-trigger");
     }
 
