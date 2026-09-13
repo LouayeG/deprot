@@ -393,6 +393,7 @@ dependencies = [
  "deprot-manifest",
  "deprot-policy",
  "deprot-report",
+ "deprot-secrets",
  "deprot-tui",
  "owo-colors",
  "tokio",

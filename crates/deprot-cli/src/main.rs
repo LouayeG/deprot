@@ -11,8 +11,9 @@ use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::Tier;
 use deprot_report::{
-    explain, summary_banner, table, to_json, to_json_packages, tree_summary, tree_table,
-    tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table, Row, TreeRow, VulnFinding,
+    explain, secret_json, secret_sarif, secret_summary, secret_table, summary_banner, table,
+    to_json, to_json_packages, tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif,
+    vuln_summary, vuln_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -48,6 +49,12 @@ struct Cli {
     /// advisory is found.
     #[arg(long)]
     vulns: bool,
+
+    /// Scan the project's own source for hardcoded secrets — API keys, tokens, private keys — with
+    /// high-precision patterns plus entropy analysis and redacted output. Exits non-zero if any are
+    /// found. Honors an inline `deprot:allow-secret` marker to suppress a line.
+    #[arg(long)]
+    secrets: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -166,6 +173,11 @@ async fn run() -> Result<()> {
     // Vuln-first audit: list every advisory across the tree/manifest.
     if cli.vulns {
         return run_vulns(&cli).await;
+    }
+
+    // Secret scan: search the project's own source for hardcoded credentials.
+    if cli.secrets {
+        return run_secrets(&cli);
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -430,6 +442,35 @@ async fn run_vulns(cli: &Cli) -> Result<()> {
     }
 
     // Vuln-first convention: a clean tree exits 0, any advisory exits non-zero.
+    if !findings.is_empty() {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Secret scan: search the project's own source tree for hardcoded credentials and report them
+/// (table, JSON, or SARIF), exiting non-zero if any are found. Pure filesystem work — no network.
+fn run_secrets(cli: &Cli) -> Result<()> {
+    let findings = deprot_secrets::scan_path(&cli.path);
+
+    if cli.sarif {
+        println!("{}", secret_sarif(&findings));
+    } else if cli.json {
+        println!("{}", secret_json(&findings));
+    } else {
+        eprintln!(
+            "{} {} {} for hardcoded secrets ...",
+            "deprot".bold(),
+            "scanning".dimmed(),
+            cli.path.display(),
+        );
+        if !findings.is_empty() {
+            println!("{}", secret_table(&findings));
+            println!();
+        }
+        println!("{}", secret_summary(&findings));
+    }
+
     if !findings.is_empty() {
         std::process::exit(1);
     }
