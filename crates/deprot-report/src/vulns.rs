@@ -221,3 +221,86 @@ pub fn vuln_json(findings: &[VulnFinding]) -> String {
     };
     serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string())
 }
+
+/// A representative `security-severity` number (what GitHub code scanning color-codes on): the CVSS
+/// score when known, else a bucket midpoint from the severity label.
+fn security_severity(f: &VulnFinding) -> f64 {
+    f.vuln.cvss.unwrap_or(match f.vuln.severity() {
+        Severity::Critical => 9.0,
+        Severity::High => 7.5,
+        Severity::Medium => 5.0,
+        Severity::Low => 2.0,
+    })
+}
+
+/// Serialize the advisories into a SARIF 2.1.0 log — one result per (package, advisory), with a
+/// `security-severity` property so GitHub code scanning ranks them. Vuln-first: RISKY→error etc.
+pub fn vuln_sarif(findings: &[VulnFinding]) -> String {
+    use serde_json::{json, Map, Value};
+
+    let mut order: Vec<&VulnFinding> = findings.iter().collect();
+    sort_findings(&mut order);
+
+    let mut rules: std::collections::BTreeMap<String, Value> = std::collections::BTreeMap::new();
+    let mut results: Vec<Value> = Vec::new();
+
+    for f in &order {
+        let sev = f.vuln.severity();
+        let level = match sev {
+            Severity::Critical | Severity::High => "error",
+            Severity::Medium => "warning",
+            Severity::Low => "note",
+        };
+        let sec = format!("{:.1}", security_severity(f));
+        let title = f.vuln.title.clone().unwrap_or_else(|| f.vuln.id.clone());
+        let fix = f
+            .vuln
+            .fixed_version
+            .as_deref()
+            .map(|v| format!("; fix: upgrade to {v}"))
+            .unwrap_or_else(|| "; no fixed version published".to_string());
+
+        rules.entry(f.vuln.id.clone()).or_insert_with(|| {
+            let mut rule = Map::new();
+            rule.insert("id".into(), json!(f.vuln.id));
+            rule.insert("name".into(), json!("KnownVulnerability"));
+            rule.insert("shortDescription".into(), json!({ "text": title }));
+            if let Some(url) = &f.vuln.reference {
+                rule.insert("helpUri".into(), json!(url));
+            }
+            rule.insert(
+                "properties".into(),
+                json!({ "security-severity": sec, "tags": ["security", "vulnerability"] }),
+            );
+            Value::Object(rule)
+        });
+
+        results.push(json!({
+            "ruleId": f.vuln.id,
+            "level": level,
+            "message": { "text": format!(
+                "{}@{} — {} [{} {}]{}",
+                f.package, f.version, title, sev_label(sev), sec, fix
+            )},
+            "properties": { "security-severity": sec },
+            "locations": [{
+                "logicalLocations": [{ "name": f.package, "kind": "package" }]
+            }]
+        }));
+    }
+
+    let sarif = json!({
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": { "driver": {
+                "name": "deprot",
+                "informationUri": "https://github.com/LouayeG/deprot",
+                "version": env!("CARGO_PKG_VERSION"),
+                "rules": rules.into_values().collect::<Vec<_>>(),
+            }},
+            "results": results,
+        }]
+    });
+    serde_json::to_string_pretty(&sarif).unwrap_or_else(|_| "{}".to_string())
+}

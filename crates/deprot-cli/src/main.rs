@@ -12,7 +12,7 @@ use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::Tier;
 use deprot_report::{
     explain, summary_banner, table, to_json, to_json_packages, tree_summary, tree_table,
-    tree_to_json, vuln_json, vuln_summary, vuln_table, Row, TreeRow, VulnFinding,
+    tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -417,7 +417,9 @@ async fn run_vulns(cli: &Cli) -> Result<()> {
         }
     }
 
-    if cli.json {
+    if cli.sarif {
+        println!("{}", vuln_sarif(&findings));
+    } else if cli.json {
         println!("{}", vuln_json(&findings));
     } else {
         if !findings.is_empty() {

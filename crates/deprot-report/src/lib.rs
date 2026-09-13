@@ -23,7 +23,7 @@ pub use sarif::to_sarif;
 pub use sbom::to_cyclonedx;
 pub use terminal::{summary_banner, table};
 pub use tree::{tree_summary, tree_table, tree_to_json, TreeRow};
-pub use vulns::{vuln_json, vuln_summary, vuln_table, VulnFinding};
+pub use vulns::{vuln_json, vuln_sarif, vuln_summary, vuln_table, VulnFinding};
 
 /// A scored dependency ready to render: the dependency, the facts-derived score, and any error
 /// that occurred while collecting its facts.
