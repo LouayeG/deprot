@@ -96,3 +96,125 @@ fn parser_for(path: &Path) -> Option<Box<dyn Manifest>> {
         _ => None,
     }
 }
+
+/// Default recursion depth for [`discover`]. Deep enough for `packages/<name>/` monorepo layouts,
+/// shallow enough to stay fast (dependency/build directories are skipped regardless).
+pub const DEFAULT_DISCOVER_DEPTH: usize = 6;
+
+/// Directories never descended into during recursive discovery — dependency stores, build output,
+/// and VCS/editor metadata. (Dot-directories are skipped separately.)
+const SKIP_DIRS: &[&str] = &[
+    "node_modules",
+    "vendor",
+    "target",
+    "dist",
+    "build",
+    "venv",
+    "__pycache__",
+    "coverage",
+];
+
+/// Recursively find every supported manifest under `root` (bounded to `max_depth`), skipping
+/// dependency and build directories and not following symlinks. If `root` is itself a manifest file
+/// it's returned directly. Results are sorted for stable ordering.
+///
+/// This is what powers multi-package / monorepo analysis: one repo often holds a `frontend/`
+/// (`package.json`), a `backend/` (`go.mod`), and more, none of which a single top-level `detect`
+/// would find.
+pub fn discover(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if root.is_file() {
+        if parser_for(root).is_some() {
+            out.push(root.to_path_buf());
+        }
+        return out;
+    }
+    discover_walk(root, 0, max_depth, &mut out);
+    out.sort();
+    out
+}
+
+fn discover_walk(dir: &Path, depth: usize, max_depth: usize, out: &mut Vec<PathBuf>) {
+    for (name, _) in CANDIDATES {
+        let p = dir.join(name);
+        if p.is_file() {
+            out.push(p);
+        }
+    }
+    if depth >= max_depth {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        if e.file_type().map(|t| t.is_symlink()).unwrap_or(true) {
+            continue; // don't follow symlinks (loops / escaping the tree)
+        }
+        let p = e.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let name = e.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') || SKIP_DIRS.contains(&name.as_ref()) {
+            continue;
+        }
+        discover_walk(&p, depth + 1, max_depth, out);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discover_finds_nested_manifests_and_skips_dependency_dirs() {
+        let root =
+            std::env::temp_dir().join(format!("deprot_disc_{}_{}", std::process::id(), line!()));
+        let write = |rel: &str| {
+            let p = root.join(rel);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            std::fs::write(p, "{}").unwrap();
+        };
+        write("package.json"); // empty root manifest
+        write("frontend/package.json");
+        write("backend/go.mod");
+        write("packages/lib/Cargo.toml");
+        write("node_modules/foo/package.json"); // must be skipped
+        write("frontend/node_modules/bar/package.json"); // must be skipped
+
+        let found = discover(&root, DEFAULT_DISCOVER_DEPTH);
+        let _ = std::fs::remove_dir_all(&root);
+
+        let rels: Vec<String> = found
+            .iter()
+            .map(|p| {
+                p.strip_prefix(&root)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .collect();
+        assert!(rels.contains(&"package.json".to_string()));
+        assert!(rels.contains(&"frontend/package.json".to_string()));
+        assert!(rels.contains(&"backend/go.mod".to_string()));
+        assert!(rels.contains(&"packages/lib/Cargo.toml".to_string()));
+        assert!(
+            !rels.iter().any(|r| r.contains("node_modules")),
+            "node_modules must be skipped, got {rels:?}"
+        );
+        assert_eq!(rels.len(), 4);
+    }
+
+    #[test]
+    fn discover_on_a_file_returns_it() {
+        let root = std::env::temp_dir().join(format!("deprot_disc_file_{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let f = root.join("go.mod");
+        std::fs::write(&f, "module x\n").unwrap();
+        let found = discover(&f, DEFAULT_DISCOVER_DEPTH);
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(found, vec![f]);
+    }
+}
