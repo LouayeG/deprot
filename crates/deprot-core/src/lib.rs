@@ -16,7 +16,7 @@ mod score;
 mod signals;
 mod typosquat;
 
-pub use facts::{Dependency, Ecosystem, Facts, Vuln};
+pub use facts::{Dependency, Ecosystem, Facts, Severity, Vuln};
 pub use graph::{DepGraph, DepNode};
 pub use maintainers::{capture_risk, top_share, MaintainerReach};
 pub use score::{score, Grade, Score, Tier};

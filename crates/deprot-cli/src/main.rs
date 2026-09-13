@@ -12,7 +12,7 @@ use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::Tier;
 use deprot_report::{
     explain, summary_banner, table, to_json, to_json_packages, tree_summary, tree_table,
-    tree_to_json, Row, TreeRow,
+    tree_to_json, vuln_json, vuln_summary, vuln_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -41,6 +41,13 @@ struct Cli {
     /// package.json, Cargo.toml and go.mod across subprojects, each reported in its own section.
     #[arg(long)]
     recursive: bool,
+
+    /// Vulnerability audit (vuln-first): list every known advisory affecting your packages — CVE
+    /// id, severity, and the fixed version to upgrade to — from OSV merged with GitHub advisories.
+    /// Scans the resolved lockfile tree when present, else the manifest. Exits non-zero if any
+    /// advisory is found.
+    #[arg(long)]
+    vulns: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -154,6 +161,11 @@ async fn run() -> Result<()> {
     // Diff mode compares two lockfiles.
     if let Some(baseline) = cli.diff.clone() {
         return run_diff(&cli, &baseline, fail_on).await;
+    }
+
+    // Vuln-first audit: list every advisory across the tree/manifest.
+    if cli.vulns {
+        return run_vulns(&cli).await;
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -349,6 +361,77 @@ fn hint_multi_package(target: &std::path::Path, already: &std::path::Path) {
         "      this looks like a multi-package repo — run {} to analyze them all.",
         format!("deprot --recursive {}", target.display()).bold()
     );
+}
+
+/// Vuln-first audit: gather every known advisory across the resolved tree (preferred) or the
+/// manifest, render them worst-first, and exit non-zero if any are found.
+async fn run_vulns(cli: &Cli) -> Result<()> {
+    let collector = collector_from(cli, false)?;
+    let mut findings: Vec<VulnFinding> = Vec::new();
+
+    // Prefer the resolved lockfile tree — that's where most advisories hide (transitive deps).
+    if let Ok(resolved) = deprot_manifest::detect_lockfile(&cli.path) {
+        eprintln!(
+            "{} {} {} packages (resolved tree) from {} for advisories ...",
+            "deprot".bold(),
+            "auditing".dimmed(),
+            resolved.graph.len(),
+            resolved.path.display(),
+        );
+        for gf in collector.collect_graph(&resolved.graph).await {
+            let node = &resolved.graph.nodes()[gf.index];
+            for v in gf.facts.vulns {
+                findings.push(VulnFinding {
+                    package: node.name.clone(),
+                    version: node.version.clone(),
+                    ecosystem: node.ecosystem.label().to_string(),
+                    vuln: v,
+                });
+            }
+        }
+    } else {
+        let detected = deprot_manifest::detect(&cli.path)
+            .with_context(|| format!("resolving target {}", cli.path.display()))?;
+        eprintln!(
+            "{} {} {} dependencies from {} for advisories ...",
+            "deprot".bold(),
+            "auditing".dimmed(),
+            detected.dependencies.len(),
+            detected.path.display(),
+        );
+        for c in collector.collect_all(&detected.dependencies).await {
+            let version = c
+                .facts
+                .analyzed_version
+                .clone()
+                .unwrap_or_else(|| "?".into());
+            let (name, eco) = (c.dependency.name, c.dependency.ecosystem);
+            for v in c.facts.vulns {
+                findings.push(VulnFinding {
+                    package: name.clone(),
+                    version: version.clone(),
+                    ecosystem: eco.label().to_string(),
+                    vuln: v,
+                });
+            }
+        }
+    }
+
+    if cli.json {
+        println!("{}", vuln_json(&findings));
+    } else {
+        if !findings.is_empty() {
+            println!("{}", vuln_table(&findings));
+            println!();
+        }
+        println!("{}", vuln_summary(&findings));
+    }
+
+    // Vuln-first convention: a clean tree exits 0, any advisory exits non-zero.
+    if !findings.is_empty() {
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
 /// Build a collector from the CLI's cache/offline/concurrency flags.
