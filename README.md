@@ -63,6 +63,7 @@ deprot ./package.json       # or a specific manifest
 deprot --recursive          # monorepo? grade every subproject (npm + Cargo + Go)
 deprot --vulns              # vuln-first: every CVE, its severity, and the fix version
 deprot --secrets            # scan your own source for leaked API keys / tokens / private keys
+deprot --workflows          # audit .github/workflows for CI supply-chain risks
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -103,6 +104,11 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- ⚙️ **`--workflows` — lock down your CI.** Audits `.github/workflows` for the current GitHub Actions
+  supply-chain attacks: **template injection** (untrusted `${{ github.event.* }}` in `run:`),
+  **pwn-requests** (`pull_request_target`/`workflow_run` checking out untrusted PR code with secrets),
+  **unpinned/mutable action refs** (not a commit SHA; `@main` is worst), **`write-all` / missing
+  permissions**, and `curl | bash`. `--json` and `--sarif` (per-line code-scanning alerts).
 - 🔑 **`--secrets` — catch leaked credentials before they ship.** Scans your *own* source for
   hardcoded API keys, tokens, and private keys with high-precision format rules **plus entropy
   analysis**, and aggressive false-positive suppression (placeholders, `${ENV}` refs, doc/example
