@@ -11,7 +11,8 @@ use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::Tier;
 use deprot_report::{
-    explain, summary_banner, table, to_json, tree_summary, tree_table, tree_to_json, Row, TreeRow,
+    explain, summary_banner, table, to_json, to_json_packages, tree_summary, tree_table,
+    tree_to_json, Row, TreeRow,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -35,6 +36,11 @@ struct Cli {
     /// not just the direct dependencies in the manifest.
     #[arg(long)]
     tree: bool,
+
+    /// Recursively discover and analyze every manifest under the directory (monorepo mode):
+    /// package.json, Cargo.toml and go.mod across subprojects, each reported in its own section.
+    #[arg(long)]
+    recursive: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -158,6 +164,11 @@ async fn run() -> Result<()> {
     // Transitive-tree mode analyzes the resolved lockfile instead of the manifest.
     if cli.tree {
         return run_tree(&cli, fail_on).await;
+    }
+
+    // Recursive/monorepo mode analyzes every manifest found under the directory.
+    if cli.recursive {
+        return run_recursive(&cli, fail_on).await;
     }
 
     // 1. Parse the manifest.
@@ -299,6 +310,121 @@ async fn run() -> Result<()> {
         std::process::exit(1);
     }
 
+    Ok(())
+}
+
+/// Build a collector from the CLI's cache/offline/concurrency flags.
+fn collector_from(cli: &Cli, enrich: bool) -> Result<Collector> {
+    Collector::new(CollectorConfig {
+        concurrency: cli.concurrency.max(1),
+        cache_ttl_secs: if cli.refresh {
+            0
+        } else {
+            DEFAULT_CACHE_TTL_SECS
+        },
+        cache_enabled: !cli.no_cache,
+        enrich,
+        offline: cli.offline,
+    })
+}
+
+/// Collect facts for a set of manifest dependencies and score them into render rows.
+async fn collect_and_score(
+    collector: &Collector,
+    deps: &[deprot_core::Dependency],
+    now: chrono::DateTime<Utc>,
+) -> Vec<Row> {
+    collector
+        .collect_all(deps)
+        .await
+        .into_iter()
+        .map(|c| Row {
+            analyzed_version: c.facts.analyzed_version.clone(),
+            score: deprot_core::score(&c.facts, now),
+            dependency: c.dependency,
+            error: c.error,
+        })
+        .collect()
+}
+
+/// Recursive/monorepo mode: discover every manifest under the target directory, analyze each in its
+/// own section, and gate on the worst verdict across all of them.
+async fn run_recursive(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
+    let manifests = deprot_manifest::discover(&cli.path, deprot_manifest::DEFAULT_DISCOVER_DEPTH);
+
+    // Parse each manifest, keeping the ones that actually declare dependencies.
+    let mut detecteds: Vec<deprot_manifest::Detected> = Vec::new();
+    for m in &manifests {
+        match deprot_manifest::detect(m) {
+            Ok(d) if !d.dependencies.is_empty() => detecteds.push(d),
+            Ok(_) => {} // empty manifest (e.g. an empty root package.json) — nothing to grade
+            Err(e) => eprintln!("{} skipping {}: {e:#}", "warning:".yellow(), m.display()),
+        }
+    }
+    if detecteds.is_empty() {
+        return Err(anyhow!(
+            "no dependencies found under {} (scanned {} manifest(s))",
+            cli.path.display(),
+            manifests.len()
+        ));
+    }
+
+    eprintln!(
+        "{} {} {} package(s) under {} ...",
+        "deprot".bold(),
+        "analyzing".dimmed(),
+        detecteds.len(),
+        cli.path.display(),
+    );
+
+    let collector = collector_from(cli, false)?;
+    let now = Utc::now();
+
+    let mut worst = Tier::Ok;
+    let mut json_pkgs: Vec<(String, String, Vec<Row>)> = Vec::new();
+
+    for d in &detecteds {
+        let mut deps = d.dependencies.clone();
+        if cli.prod_only {
+            deps.retain(|x| x.direct);
+        }
+        if deps.is_empty() {
+            continue;
+        }
+        let rows = collect_and_score(&collector, &deps, now).await;
+        worst = worst.max(rows.iter().map(|r| r.score.tier).max().unwrap_or(Tier::Ok));
+
+        let label = d
+            .path
+            .strip_prefix(&cli.path)
+            .unwrap_or(&d.path)
+            .display()
+            .to_string();
+
+        if cli.json {
+            json_pkgs.push((label, d.ecosystem.label().to_string(), rows));
+        } else {
+            println!(
+                "{} {} ({})",
+                "▌".cyan().bold(),
+                label.bold(),
+                d.ecosystem.label()
+            );
+            println!("{}", table(&rows));
+            println!("{}", summary_banner(&rows));
+            println!();
+        }
+    }
+
+    if cli.json {
+        println!("{}", to_json_packages(&json_pkgs));
+    }
+
+    if let Some(threshold) = fail_on {
+        if worst >= threshold {
+            std::process::exit(1);
+        }
+    }
     Ok(())
 }
 
