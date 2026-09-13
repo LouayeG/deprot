@@ -60,6 +60,7 @@ cargo install deprot
 ```bash
 deprot                      # grade the project in the current directory
 deprot ./package.json       # or a specific manifest
+deprot --recursive          # monorepo? grade every subproject (npm + Cargo + Go)
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -100,6 +101,11 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- 🗂️ **`--recursive` — monorepo mode.** One repo, many subprojects: a `frontend/` (`package.json`), a
+  `backend/` (`go.mod`), `packages/*` (`Cargo.toml`)… deprot discovers **every** manifest under the
+  directory, grades each in its own section, and fails CI on the worst verdict across all of them.
+  Dependency/build dirs (`node_modules`, `vendor`, `target`, …) are skipped. Point deprot at the repo
+  root and it just works — no more empty-root dead ends.
 - 📦 **`--installed` — grade what's *actually on disk*.** Scans the real install — your `node_modules`
   and the active Python environment (`importlib.metadata`, no lockfile needed) — at the exact versions
   present, so it catches **drift from the lockfile** and packages installed by hand. Add **`--global`**
@@ -140,7 +146,7 @@ number is their weighted average (a missing data source lowers confidence, it do
 |--------|:----:|----------|
 | [deps.dev](https://deps.dev) | none | releases, licenses, advisories, linked repo, OpenSSF Scorecard |
 | [OSV.dev](https://osv.dev) | none | vulnerabilities (via deps.dev advisories) |
-| npm / crates.io / PyPI | none | publish metadata, maintainers/owners, install scripts |
+| npm / crates.io / PyPI / Go | none | publish metadata, maintainers/owners, install scripts |
 | GitHub API | *optional* token | deeper repo signals — never required |
 
 Results are cached on disk (24h TTL) so re-runs are instant and polite to the APIs.
