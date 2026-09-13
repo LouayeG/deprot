@@ -20,6 +20,7 @@ fi
 CRATES=(
   deprot-core
   deprot-secrets
+  deprot-actions
   deprot-manifest
   deprot-collect
   deprot-report

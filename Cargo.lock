@@ -388,6 +388,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "deprot-actions",
  "deprot-collect",
  "deprot-core",
  "deprot-manifest",

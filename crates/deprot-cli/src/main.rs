@@ -13,7 +13,8 @@ use deprot_core::Tier;
 use deprot_report::{
     explain, secret_json, secret_sarif, secret_summary, secret_table, summary_banner, table,
     to_json, to_json_packages, tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif,
-    vuln_summary, vuln_table, Row, TreeRow, VulnFinding,
+    vuln_summary, vuln_table, workflow_json, workflow_sarif, workflow_summary, workflow_table, Row,
+    TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -55,6 +56,12 @@ struct Cli {
     /// found. Honors an inline `deprot:allow-secret` marker to suppress a line.
     #[arg(long)]
     secrets: bool,
+
+    /// Audit GitHub Actions workflows (.github/workflows) for CI supply-chain risks: template
+    /// injection, pwn-requests, unpinned/mutable action refs, over-broad GITHUB_TOKEN permissions,
+    /// and curl|bash. Exits non-zero if any issue is found.
+    #[arg(long)]
+    workflows: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -178,6 +185,11 @@ async fn run() -> Result<()> {
     // Secret scan: search the project's own source for hardcoded credentials.
     if cli.secrets {
         return run_secrets(&cli);
+    }
+
+    // Workflow security: audit .github/workflows for CI supply-chain risks.
+    if cli.workflows {
+        return run_workflows(&cli);
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -469,6 +481,35 @@ fn run_secrets(cli: &Cli) -> Result<()> {
             println!();
         }
         println!("{}", secret_summary(&findings));
+    }
+
+    if !findings.is_empty() {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Workflow-security audit: analyze `.github/workflows` for CI supply-chain risks and report them
+/// (table, JSON, or SARIF), exiting non-zero on any finding. Pure filesystem work — no network.
+fn run_workflows(cli: &Cli) -> Result<()> {
+    let findings = deprot_actions::scan_path(&cli.path);
+
+    if cli.sarif {
+        println!("{}", workflow_sarif(&findings));
+    } else if cli.json {
+        println!("{}", workflow_json(&findings));
+    } else {
+        eprintln!(
+            "{} {} GitHub Actions workflows in {} ...",
+            "deprot".bold(),
+            "auditing".dimmed(),
+            cli.path.display(),
+        );
+        if !findings.is_empty() {
+            println!("{}", workflow_table(&findings));
+            println!();
+        }
+        println!("{}", workflow_summary(&findings));
     }
 
     if !findings.is_empty() {
