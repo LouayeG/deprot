@@ -231,12 +231,14 @@ impl DepsDev {
                         id: key.id.clone(),
                         cvss: adv.cvss3_score,
                         title: adv.title,
+                        reference: Some(format!("https://osv.dev/vulnerability/{}", key.id)),
+                        ..Default::default()
                     });
                 } else {
                     facts.vulns.push(Vuln {
                         id: key.id.clone(),
-                        cvss: None,
-                        title: None,
+                        reference: Some(format!("https://osv.dev/vulnerability/{}", key.id)),
+                        ..Default::default()
                     });
                 }
             }

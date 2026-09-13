@@ -55,6 +55,7 @@ fn high_severity_vuln_forces_risky() {
             id: "GHSA-xxxx".into(),
             cvss: Some(9.1),
             title: Some("rce".into()),
+            ..Default::default()
         }],
         ..Default::default()
     };

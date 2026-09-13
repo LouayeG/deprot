@@ -55,27 +55,57 @@ pub struct Dependency {
 }
 
 /// A known vulnerability affecting the analyzed version.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Vuln {
-    /// Advisory identifier (e.g. a GHSA id).
+    /// Primary advisory identifier — a CVE id when one exists, otherwise the GHSA/OSV id.
     pub id: String,
-    /// CVSS v3 base score (0.0–10.0), if published.
+    /// CVSS base score (0.0–10.0), if published or computable from a CVSS vector.
     pub cvss: Option<f64>,
-    /// Short human-readable title.
+    /// Short human-readable title / summary.
     pub title: Option<String>,
+    /// Other identifiers for the same advisory (CVE / GHSA / OSV / RUSTSEC …), for cross-reference.
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    /// The first version that fixes this advisory for the analyzed package, if known — what a user
+    /// should upgrade to. `None` means no fixed version is published yet.
+    #[serde(default)]
+    pub fixed_version: Option<String>,
+    /// A primary reference URL (the advisory page), if available.
+    #[serde(default)]
+    pub reference: Option<String>,
+    /// Database severity label (e.g. `CRITICAL`, `HIGH`) used when no numeric CVSS is available.
+    #[serde(default)]
+    pub severity_label: Option<String>,
 }
 
 impl Vuln {
-    /// Severity bucket derived from the CVSS score. Missing scores are treated as `Medium` so an
-    /// unscored-but-real advisory is never silently ignored.
+    /// Severity bucket. Prefers the numeric CVSS score, falls back to a database severity label,
+    /// and treats a completely unscored-but-real advisory as `Medium` so it's never silently
+    /// ignored.
     pub fn severity(&self) -> Severity {
-        match self.cvss {
-            Some(s) if s >= 9.0 => Severity::Critical,
-            Some(s) if s >= 7.0 => Severity::High,
-            Some(s) if s >= 4.0 => Severity::Medium,
-            Some(_) => Severity::Low,
-            None => Severity::Medium,
+        if let Some(s) = self.cvss {
+            return if s >= 9.0 {
+                Severity::Critical
+            } else if s >= 7.0 {
+                Severity::High
+            } else if s >= 4.0 {
+                Severity::Medium
+            } else {
+                Severity::Low
+            };
         }
+        match self.severity_label.as_deref().map(str::to_ascii_uppercase) {
+            Some(l) if l == "CRITICAL" => Severity::Critical,
+            Some(l) if l == "HIGH" => Severity::High,
+            Some(l) if l == "MODERATE" || l == "MEDIUM" => Severity::Medium,
+            Some(l) if l == "LOW" => Severity::Low,
+            _ => Severity::Medium,
+        }
+    }
+
+    /// Whether a fixed version is published (i.e. the advisory is actionable by upgrading).
+    pub fn is_fixable(&self) -> bool {
+        self.fixed_version.is_some()
     }
 }
 
