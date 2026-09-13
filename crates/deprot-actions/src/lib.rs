@@ -8,5 +8,7 @@
 //! dependency); the walker ([`scan_path`]) is the only part that touches disk.
 
 mod detect;
+mod walk;
 
 pub use detect::{analyze_workflow, ActionFinding};
+pub use walk::scan_path;
