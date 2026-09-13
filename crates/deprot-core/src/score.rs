@@ -120,6 +120,14 @@ pub fn score(facts: &Facts, now: DateTime<Utc>) -> Score {
 
     // Forced escalations — facts that must not be averaged away.
     let mut forced_reasons = Vec::new();
+    // A package we could not resolve at all (unknown/typosquatted name, a registry 404, or a
+    // failed lookup) must never be presented as healthy: absence of data is not absence of risk.
+    // Force RISKY with an explicit reason so a CI gate (`--fail-on risky`) surfaces it instead of
+    // the remaining default signals averaging into a reassuring grade.
+    if facts.is_unresolved() {
+        forced_reasons
+            .push("no registry data — package unknown or lookup failed; risk not assessable".to_string());
+    }
     if facts.deprecated {
         forced_reasons.push("package is deprecated".to_string());
     }

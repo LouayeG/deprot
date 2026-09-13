@@ -90,13 +90,20 @@ fn stale_package_scores_low() {
     assert!(s.value < 80, "stale pkg should not be OK, got {}", s.value);
 }
 
-/// With no facts at all, the engine returns a neutral 50 rather than a misleading perfect score.
+/// With no facts at all — an unknown/typosquatted name, a 404, or a failed lookup — the package is
+/// unassessed and must NOT read as healthy. It's forced RISKY with an explanatory reason, and the
+/// free "no known advisories" credit is withheld.
 #[test]
-fn no_facts_is_neutral() {
+fn no_data_is_flagged_not_healthy() {
     let facts = Facts::default();
     let s = score(&facts, now());
-    // Only the "no known advisories" and "no license declared" signals fire here.
-    assert!(s.value > 0 && s.value < 100);
+    assert_eq!(s.tier, Tier::Risky, "unresolved package must not pass, got {}", s.value);
+    assert!(s
+        .forced_reasons
+        .iter()
+        .any(|r| r.contains("no registry data")));
+    // The bogus positive vulnerability signal is gone when there's no data.
+    assert!(s.signals.iter().all(|sig| sig.name != "vulnerabilities"));
 }
 
 /// Same input, same output — the property the whole replay/testing story rests on.

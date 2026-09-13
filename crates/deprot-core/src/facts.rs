@@ -128,3 +128,16 @@ pub struct Facts {
     #[serde(default)]
     pub has_install_script: bool,
 }
+
+impl Facts {
+    /// Whether the collector obtained **no** registry data for this package — an unknown or
+    /// typosquatted name, a registry 404, or a failed/offline lookup. The collector always sets
+    /// `total_versions` (and usually `latest_published`) the moment it reaches the registry, so
+    /// both being absent means we never got a usable response.
+    ///
+    /// Scoring uses this to avoid presenting an *unassessed* package as healthy: absence of data
+    /// is not absence of risk.
+    pub fn is_unresolved(&self) -> bool {
+        self.total_versions.is_none() && self.latest_published.is_none()
+    }
+}

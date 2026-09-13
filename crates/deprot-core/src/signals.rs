@@ -79,6 +79,13 @@ pub fn deprecation(facts: &Facts) -> Option<Signal> {
 /// Known vulnerabilities: driven by the single worst advisory affecting the analyzed version.
 pub fn vulnerabilities(facts: &Facts) -> Option<Signal> {
     if facts.vulns.is_empty() {
+        // "No known advisories" is only a *positive* signal about a version we actually resolved
+        // and inspected. When the package could not be resolved at all, an empty vuln list is
+        // absence of data, not a clean bill of health — contribute no signal and let `score` treat
+        // the package as unassessed.
+        if facts.is_unresolved() {
+            return None;
+        }
         // Absence of *known* vulns is a (mild) positive signal we can assert.
         return Some(Signal::new(
             "vulnerabilities",
