@@ -189,7 +189,8 @@ impl App {
         let keep = self.current().map(|r| r.dependency.name.clone());
         self.sort = self.sort.next();
         self.apply_sort();
-        self.restore_selection(keep);
+        self.restore_selection(keep.clone());
+        self.note_selection_change(keep);
     }
 
     /// Cycle the tier filter: all → risky → caution+worse → all.
@@ -201,7 +202,8 @@ impl App {
             _ => None,
         };
         self.rebuild();
-        self.restore_selection(keep);
+        self.restore_selection(keep.clone());
+        self.note_selection_change(keep);
     }
 
     /// Human label for the active filter.
@@ -263,6 +265,16 @@ impl App {
         }
     }
 
+    /// If the highlighted package differs from `prev` (a filter/query/sort implicitly moved the
+    /// selection to a different package), reset the detail pane and re-trigger its animation — the
+    /// same bookkeeping an explicit navigation does.
+    fn note_selection_change(&mut self, prev: Option<String>) {
+        let now = self.current().map(|r| r.dependency.name.clone());
+        if now != prev {
+            self.on_selection_changed();
+        }
+    }
+
     // ---- search input ----
 
     /// Enter search-input mode.
@@ -277,21 +289,27 @@ impl App {
 
     /// Leave search-input mode and clear the query.
     pub fn cancel_search(&mut self) {
+        let keep = self.current().map(|r| r.dependency.name.clone());
         self.searching = false;
         self.query.clear();
         self.rebuild();
+        self.note_selection_change(keep);
     }
 
     /// Append a character to the query and refilter.
     pub fn push_query(&mut self, c: char) {
+        let keep = self.current().map(|r| r.dependency.name.clone());
         self.query.push(c);
         self.rebuild();
+        self.note_selection_change(keep);
     }
 
     /// Delete the last query character and refilter.
     pub fn pop_query(&mut self) {
+        let keep = self.current().map(|r| r.dependency.name.clone());
         self.query.pop();
         self.rebuild();
+        self.note_selection_change(keep);
     }
 
     /// Toggle the help overlay.
@@ -389,6 +407,23 @@ mod tests {
         assert_eq!(app.current().unwrap().dependency.name, "lodash");
         app.cancel_search();
         assert_eq!(app.visible_len(), 2);
+    }
+
+    #[test]
+    fn filtering_that_moves_selection_resets_detail() {
+        let mut app = App::new(vec![row("a", false), row("bad", true), row("c", false)]);
+        // Highlight a healthy row and scroll its detail pane.
+        app.next();
+        assert_ne!(app.current().unwrap().dependency.name, "bad");
+        app.scroll_detail_down();
+        assert!(app.detail_scroll > 0);
+        let gen = app.selection_generation;
+
+        // Filtering to risky-only drops the healthy selection, moving the highlight to "bad".
+        app.cycle_filter();
+        assert_eq!(app.current().unwrap().dependency.name, "bad");
+        assert_eq!(app.detail_scroll, 0, "detail scroll must reset on selection change");
+        assert!(app.selection_generation > gen, "animation must re-trigger");
     }
 
     #[test]
