@@ -7,6 +7,7 @@
 //! Rendering is kept separate from scoring so the same [`Row`] data can be presented three ways
 //! without the engine knowing anything about presentation.
 
+mod actions;
 mod explain;
 mod json;
 mod sarif;
@@ -18,6 +19,7 @@ mod vulns;
 
 use deprot_core::{Dependency, Score};
 
+pub use actions::{workflow_json, workflow_sarif, workflow_summary, workflow_table};
 pub use explain::explain;
 pub use json::{to_json, to_json_packages};
 pub use sarif::to_sarif;

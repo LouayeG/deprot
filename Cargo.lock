@@ -460,6 +460,7 @@ name = "deprot-report"
 version = "0.4.0"
 dependencies = [
  "comfy-table",
+ "deprot-actions",
  "deprot-core",
  "deprot-secrets",
  "owo-colors",

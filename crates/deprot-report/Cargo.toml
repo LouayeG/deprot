@@ -13,6 +13,7 @@ categories.workspace = true
 [dependencies]
 deprot-core = { workspace = true }
 deprot-secrets = { workspace = true }
+deprot-actions = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 owo-colors = { workspace = true }
