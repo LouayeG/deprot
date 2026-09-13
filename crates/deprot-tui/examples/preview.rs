@@ -25,6 +25,7 @@ fn row(name: &str, version: &str, days_old: i64, releases: u32, deprecated: bool
             direct: true,
         },
         error: None,
+        source: None,
     }
 }
 

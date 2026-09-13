@@ -62,11 +62,15 @@ pub struct App {
     /// Bumped whenever the highlighted package changes — the render loop watches this to (re)start
     /// the signal-fill animation.
     pub selection_generation: u64,
+    /// Whether any row carries a subproject `source` (i.e. this is a `--recursive` merged view) —
+    /// gates the extra SUBPROJECT column and source-aware search.
+    has_sources: bool,
 }
 
 impl App {
     /// Build the app from scored rows, applying the default (tier) sort.
     pub fn new(rows: Vec<Row>) -> Self {
+        let has_sources = rows.iter().any(|r| r.source.is_some());
         let mut app = App {
             all: rows,
             filtered: Vec::new(),
@@ -79,9 +83,15 @@ impl App {
             detail_scroll: 0,
             should_quit: false,
             selection_generation: 0,
+            has_sources,
         };
         app.apply_sort();
         app
+    }
+
+    /// Whether rows carry subproject sources (a merged `--recursive` view).
+    pub fn has_sources(&self) -> bool {
+        self.has_sources
     }
 
     /// Total number of dependencies (ignoring any filter).
@@ -243,7 +253,11 @@ impl App {
                     Some(min) => r.score.tier >= min,
                     None => true,
                 };
-                let query_ok = q.is_empty() || r.dependency.name.to_lowercase().contains(&q);
+                let query_ok = q.is_empty()
+                    || r.dependency.name.to_lowercase().contains(&q)
+                    || r.source
+                        .as_deref()
+                        .is_some_and(|s| s.to_lowercase().contains(&q));
                 tier_ok && query_ok
             })
             .map(|(i, _)| i)
@@ -350,6 +364,7 @@ mod tests {
                 direct: true,
             },
             error: None,
+            source: None,
         }
     }
 

@@ -34,4 +34,8 @@ pub struct Row {
     pub score: Score,
     /// Present when fact collection failed (the score is then low-confidence).
     pub error: Option<String>,
+    /// The subproject this dependency came from in multi-package (`--recursive`) mode, e.g.
+    /// `frontend` — `None` for a single-manifest analysis. Lets the TUI group and label a merged
+    /// monorepo view.
+    pub source: Option<String>,
 }

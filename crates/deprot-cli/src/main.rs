@@ -218,6 +218,7 @@ async fn run() -> Result<()> {
             score: deprot_core::score(&c.facts, now),
             dependency: c.dependency,
             error: c.error,
+            source: None,
         })
         .collect();
 
@@ -365,11 +366,13 @@ fn collector_from(cli: &Cli, enrich: bool) -> Result<Collector> {
     })
 }
 
-/// Collect facts for a set of manifest dependencies and score them into render rows.
+/// Collect facts for a set of manifest dependencies and score them into render rows, tagging each
+/// with its originating subproject (`source`) for the multi-package view.
 async fn collect_and_score(
     collector: &Collector,
     deps: &[deprot_core::Dependency],
     now: chrono::DateTime<Utc>,
+    source: Option<&str>,
 ) -> Vec<Row> {
     collector
         .collect_all(deps)
@@ -380,6 +383,7 @@ async fn collect_and_score(
             score: deprot_core::score(&c.facts, now),
             dependency: c.dependency,
             error: c.error,
+            source: source.map(str::to_string),
         })
         .collect()
 }
@@ -418,7 +422,7 @@ async fn run_recursive(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
     let now = Utc::now();
 
     let mut worst = Tier::Ok;
-    let mut json_pkgs: Vec<(String, String, Vec<Row>)> = Vec::new();
+    let mut packages: Vec<(String, String, Vec<Row>)> = Vec::new();
 
     for d in &detecteds {
         let mut deps = d.dependencies.clone();
@@ -428,7 +432,18 @@ async fn run_recursive(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
         if deps.is_empty() {
             continue;
         }
-        let rows = collect_and_score(&collector, &deps, now).await;
+
+        // Short subproject label (the manifest's directory, relative to the target) used to tag and
+        // group rows in the merged TUI view; e.g. `frontend`, `backend`, `.` for the repo root.
+        let group = d
+            .path
+            .parent()
+            .and_then(|p| p.strip_prefix(&cli.path).ok())
+            .map(|p| p.to_string_lossy().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| ".".to_string());
+
+        let rows = collect_and_score(&collector, &deps, now, Some(&group)).await;
         worst = worst.max(rows.iter().map(|r| r.score.tier).max().unwrap_or(Tier::Ok));
 
         let label = d
@@ -437,24 +452,33 @@ async fn run_recursive(cli: &Cli, fail_on: Option<Tier>) -> Result<()> {
             .unwrap_or(&d.path)
             .display()
             .to_string();
+        packages.push((label, d.ecosystem.label().to_string(), rows));
+    }
 
-        if cli.json {
-            json_pkgs.push((label, d.ecosystem.label().to_string(), rows));
-        } else {
-            println!(
-                "{} {} ({})",
-                "▌".cyan().bold(),
-                label.bold(),
-                d.ecosystem.label()
-            );
-            println!("{}", table(&rows));
-            println!("{}", summary_banner(&rows));
-            println!();
+    // Interactive mode: merge every subproject's dependencies into one browsable list (each row
+    // carries its `source`, so the TUI can label and filter by subproject). Like the single-manifest
+    // --tui, this is for exploration, so it skips the CI gate.
+    if cli.tui {
+        use std::io::IsTerminal;
+        if !std::io::stdout().is_terminal() {
+            return Err(anyhow!(
+                "--tui requires an interactive terminal; omit it for table output or use --json"
+            ));
         }
+        let all: Vec<Row> = packages.into_iter().flat_map(|(_, _, rows)| rows).collect();
+        deprot_tui::run(all)?;
+        return Ok(());
     }
 
     if cli.json {
-        println!("{}", to_json_packages(&json_pkgs));
+        println!("{}", to_json_packages(&packages));
+    } else {
+        for (label, eco, rows) in &packages {
+            println!("{} {} ({})", "▌".cyan().bold(), label.bold(), eco);
+            println!("{}", table(rows));
+            println!("{}", summary_banner(rows));
+            println!();
+        }
     }
 
     if let Some(threshold) = fail_on {
