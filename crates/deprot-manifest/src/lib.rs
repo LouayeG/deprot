@@ -10,11 +10,13 @@ use deprot_core::{Dependency, Ecosystem};
 use std::path::{Path, PathBuf};
 
 mod cargo;
+mod go;
 mod installed;
 mod lockfile;
 mod npm;
 
 pub use cargo::CargoManifest;
+pub use go::GoManifest;
 pub use installed::{scan_installed, InstalledOptions, InstalledScan};
 pub use lockfile::{detect_lockfile, ResolvedGraph};
 pub use npm::NpmManifest;
@@ -31,6 +33,7 @@ pub trait Manifest {
 const CANDIDATES: &[(&str, Ecosystem)] = &[
     ("package.json", Ecosystem::Npm),
     ("Cargo.toml", Ecosystem::Cargo),
+    ("go.mod", Ecosystem::Go),
     // Additional ecosystems (requirements.txt, ...) are registered here as their adapters land.
 ];
 
@@ -89,6 +92,7 @@ fn parser_for(path: &Path) -> Option<Box<dyn Manifest>> {
     match name {
         "package.json" => Some(Box::new(NpmManifest)),
         "Cargo.toml" => Some(Box::new(CargoManifest)),
+        "go.mod" => Some(Box::new(GoManifest)),
         _ => None,
     }
 }
