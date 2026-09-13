@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "deprot"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "deprot-collect"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -407,7 +407,7 @@ dependencies = [
 
 [[package]]
 name = "deprot-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "serde",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "deprot-manifest"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "deprot-core",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "deprot-policy"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -437,7 +437,7 @@ dependencies = [
 
 [[package]]
 name = "deprot-report"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "comfy-table",
  "deprot-core",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "deprot-tui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
