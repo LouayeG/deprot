@@ -21,6 +21,7 @@ CRATES=(
   deprot-core
   deprot-secrets
   deprot-actions
+  deprot-hygiene
   deprot-manifest
   deprot-collect
   deprot-report

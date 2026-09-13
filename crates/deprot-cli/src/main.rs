@@ -9,12 +9,12 @@ use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
-use deprot_core::Tier;
+use deprot_core::{Severity, Tier};
 use deprot_report::{
-    explain, secret_json, secret_sarif, secret_summary, secret_table, summary_banner, table,
-    to_json, to_json_packages, tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif,
-    vuln_summary, vuln_table, workflow_json, workflow_sarif, workflow_summary, workflow_table, Row,
-    TreeRow, VulnFinding,
+    explain, hygiene_json, hygiene_summary, hygiene_table, secret_json, secret_sarif,
+    secret_summary, secret_table, summary_banner, table, to_json, to_json_packages, tree_summary,
+    tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table, workflow_json,
+    workflow_sarif, workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -62,6 +62,12 @@ struct Cli {
     /// and curl|bash. Exits non-zero if any issue is found.
     #[arg(long)]
     workflows: bool,
+
+    /// Audit the repository's security posture (hygiene): security policy, committed lockfile, a
+    /// .gitignore that covers secrets, no committed credential files, dependency automation, CI,
+    /// CODEOWNERS — scored 0–100. Exits non-zero only on a serious gap (e.g. a committed credential).
+    #[arg(long)]
+    hygiene: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -190,6 +196,11 @@ async fn run() -> Result<()> {
     // Workflow security: audit .github/workflows for CI supply-chain risks.
     if cli.workflows {
         return run_workflows(&cli);
+    }
+
+    // Repository hygiene: score the project's security posture.
+    if cli.hygiene {
+        return run_hygiene(&cli);
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -513,6 +524,36 @@ fn run_workflows(cli: &Cli) -> Result<()> {
     }
 
     if !findings.is_empty() {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Repository hygiene audit: score the project's security posture and report it (table or JSON).
+/// Exits non-zero only on a serious (High+) gap — e.g. a committed credential file — so routine
+/// posture nits don't fail CI. Pure filesystem work — no network.
+fn run_hygiene(cli: &Cli) -> Result<()> {
+    let report = deprot_hygiene::analyze(&cli.path);
+
+    if cli.json {
+        println!("{}", hygiene_json(&report));
+    } else {
+        eprintln!(
+            "{} {} repository hygiene in {} ...",
+            "deprot".bold(),
+            "auditing".dimmed(),
+            cli.path.display(),
+        );
+        println!("{}", hygiene_table(&report));
+        println!();
+        println!("{}", hygiene_summary(&report));
+    }
+
+    let serious = report
+        .checks
+        .iter()
+        .any(|c| !c.passed && c.severity >= Severity::High);
+    if serious {
         std::process::exit(1);
     }
     Ok(())
