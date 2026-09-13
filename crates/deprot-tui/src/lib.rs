@@ -261,6 +261,35 @@ mod tests {
     }
 
     #[test]
+    fn recursive_view_shows_subproject_column() {
+        let facts = Facts {
+            latest_published: Some(chrono::Utc::now()),
+            releases_last_year: Some(8),
+            total_versions: Some(10),
+            licenses: vec!["MIT".into()],
+            ..Default::default()
+        };
+        let rows = vec![Row {
+            analyzed_version: Some("1.0.0".into()),
+            score: score(&facts, chrono::Utc::now()),
+            dependency: Dependency {
+                name: "leftpad".into(),
+                requested: None,
+                ecosystem: Ecosystem::Npm,
+                direct: true,
+            },
+            error: None,
+            source: Some("frontend".into()),
+        }];
+        let text = render_to_text(rows, 120, 30);
+        assert!(
+            text.contains("SUBPROJECT"),
+            "subproject column header missing"
+        );
+        assert!(text.contains("frontend"), "subproject label missing");
+    }
+
+    #[test]
     fn splash_renders() {
         let backend = TestBackend::new(90, 24);
         let mut terminal = Terminal::new(backend).unwrap();

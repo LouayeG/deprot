@@ -102,9 +102,11 @@ fn draw_hero(f: &mut Frame, app: &App, area: Rect) {
 
 /// The navigable dependency list, with a highlighted selection and a scrollbar.
 fn draw_list(f: &mut Frame, app: &App, area: Rect) {
+    // In a merged --recursive view, an extra column tags each row with its subproject.
+    let show_source = app.has_sources();
     let rows = app.visible().map(|r| {
         let tc = theme::tier_color(r.score.tier);
-        TableRow::new(vec![
+        let mut cells = vec![
             Cell::from(Span::styled(
                 r.dependency.name.clone(),
                 Style::default().fg(theme::INK),
@@ -121,7 +123,14 @@ fn draw_list(f: &mut Frame, app: &App, area: Rect) {
                 r.score.tier.as_str().to_uppercase(),
                 Style::default().fg(tc),
             )),
-        ])
+        ];
+        if show_source {
+            cells.push(Cell::from(Span::styled(
+                r.source.clone().unwrap_or_default(),
+                Style::default().fg(theme::DIM),
+            )));
+        }
+        TableRow::new(cells)
     });
 
     let title = if app.query.is_empty() {
@@ -130,26 +139,27 @@ fn draw_list(f: &mut Frame, app: &App, area: Rect) {
         format!(" dependencies · /{} ", app.query)
     };
 
-    let table = Table::new(
-        rows,
-        [
-            Constraint::Min(10),
-            Constraint::Length(4),
-            Constraint::Length(5),
-            Constraint::Length(8),
-        ],
-    )
-    .header(
-        TableRow::new(vec!["PACKAGE", "SCR", "GRD", "VERDICT"])
-            .style(Style::default().fg(theme::DIM)),
-    )
-    .row_highlight_style(
-        Style::default()
-            .bg(Color::Rgb(40, 44, 52))
-            .add_modifier(Modifier::BOLD),
-    )
-    .highlight_symbol("▍ ")
-    .block(panel(&title));
+    let mut header = vec!["PACKAGE", "SCR", "GRD", "VERDICT"];
+    let mut widths = vec![
+        Constraint::Min(10),
+        Constraint::Length(4),
+        Constraint::Length(5),
+        Constraint::Length(8),
+    ];
+    if show_source {
+        header.push("SUBPROJECT");
+        widths.push(Constraint::Length(14));
+    }
+
+    let table = Table::new(rows, widths)
+        .header(TableRow::new(header).style(Style::default().fg(theme::DIM)))
+        .row_highlight_style(
+            Style::default()
+                .bg(Color::Rgb(40, 44, 52))
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▍ ")
+        .block(panel(&title));
 
     let mut state = TableState::default().with_selected(Some(app.selected));
     f.render_stateful_widget(table, area, &mut state);
@@ -274,6 +284,13 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect, anim: f64) {
         lines.push(Line::from(spans));
     }
 
+    if let Some(src) = &row.source {
+        lines.push(Line::from(Span::styled(
+            format!("from {src}"),
+            Style::default().fg(theme::DIM),
+        )));
+    }
+
     if let Some(err) = &row.error {
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
@@ -378,7 +395,7 @@ fn draw_help(f: &mut Frame, area: Rect) {
         ("↑ / ↓  or  j / k", "move selection"),
         ("g / G", "jump to top / bottom"),
         ("PgUp / PgDn", "scroll the details pane"),
-        ("/", "search by package name"),
+        ("/", "search by package or subproject"),
         ("f", "cycle verdict filter (all/risky/caution+)"),
         ("s", "cycle sort (tier/score/name)"),
         ("o", "open the package's source/advisory URL"),
