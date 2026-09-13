@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/deprot-core",
+    "crates/deprot-secrets",
     "crates/deprot-manifest",
     "crates/deprot-collect",
     "crates/deprot-report",
@@ -24,6 +25,7 @@ categories = ["command-line-utilities", "development-tools"]
 [workspace.dependencies]
 # internal (path + version so each crate is publishable to crates.io)
 deprot-core = { path = "crates/deprot-core", version = "0.3.0" }
+deprot-secrets = { path = "crates/deprot-secrets", version = "0.3.0" }
 deprot-manifest = { path = "crates/deprot-manifest", version = "0.3.0" }
 deprot-collect = { path = "crates/deprot-collect", version = "0.3.0" }
 deprot-report = { path = "crates/deprot-report", version = "0.3.0" }
@@ -45,6 +47,7 @@ directories = "5"
 semver = "1"
 toml = "0.8"
 ratatui = "0.29"
+regex = "1"
 
 [profile.release]
 lto = "thin"
