@@ -12,10 +12,11 @@ use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::{Severity, Tier};
 use deprot_report::{
     explain, hygiene_json, hygiene_summary, hygiene_table, malware_json, malware_sarif,
-    malware_summary, malware_table, reach_json, reach_summary, reach_table, secret_json,
-    secret_sarif, secret_summary, secret_table, summary_banner, table, to_json, to_json_packages,
-    tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table,
-    workflow_json, workflow_sarif, workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
+    malware_summary, malware_table, netmon_json, netmon_summary, netmon_table, reach_json,
+    reach_summary, reach_table, secret_json, secret_sarif, secret_summary, secret_table,
+    summary_banner, table, to_json, to_json_packages, tree_summary, tree_table, tree_to_json,
+    vuln_json, vuln_sarif, vuln_summary, vuln_table, workflow_json, workflow_sarif,
+    workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -164,6 +165,17 @@ struct Cli {
     /// Maximum number of concurrent lookups.
     #[arg(long, default_value_t = 12)]
     concurrency: usize,
+
+    /// Runtime network monitoring: run a command (typically an install/build) and report every
+    /// outbound connection its process tree makes — cloud-metadata credential probes and external
+    /// phone-homes stand out. Put the command after `--`, e.g. `deprot --watch -- npm install`.
+    /// Linux only. Exits non-zero on a metadata/external connection. --json for CI.
+    #[arg(long)]
+    watch: bool,
+
+    /// The command run under `--watch` (everything after `--`).
+    #[arg(last = true, num_args = 0.., value_name = "CMD")]
+    command: Vec<String>,
 }
 
 #[tokio::main]
@@ -223,6 +235,11 @@ async fn run() -> Result<()> {
     // Malicious-code scan: search the source for dropper/malware signatures.
     if cli.malware {
         return run_malware(&cli);
+    }
+
+    // Runtime network monitoring: run a command and watch its outbound connections.
+    if cli.watch {
+        return run_watch(&cli);
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -642,6 +659,54 @@ fn run_malware(cli: &Cli) -> Result<()> {
 
     if findings.iter().any(|f| f.severity >= Severity::High) {
         std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Runtime network monitoring: run the command after `--` and report the outbound connections its
+/// process tree makes. Exits non-zero if any external or cloud-metadata connection is seen (a strong
+/// supply-chain-exfiltration signal for an install/build step). Linux only.
+fn run_watch(cli: &Cli) -> Result<()> {
+    if cli.command.is_empty() {
+        return Err(anyhow!(
+            "--watch needs a command to run, e.g. `deprot --watch -- npm install`"
+        ));
+    }
+    if !cli.json {
+        eprintln!(
+            "{} {} `{}` under network monitoring ...",
+            "deprot".bold(),
+            "running".dimmed(),
+            cli.command.join(" "),
+        );
+    }
+    let report = deprot_netmon::watch(&cli.command, 60)
+        .with_context(|| format!("running `{}`", cli.command.join(" ")))?;
+
+    if cli.json {
+        println!("{}", netmon_json(&report));
+    } else {
+        if !report.findings.is_empty() {
+            println!();
+            println!("{}", netmon_table(&report));
+            println!();
+        }
+        println!("{}", netmon_summary(&report));
+    }
+
+    // A metadata or external connection during an install/build is the exfiltration signal.
+    let flagged = report
+        .findings
+        .iter()
+        .any(|f| f.severity >= Severity::Medium);
+    if flagged {
+        std::process::exit(1);
+    }
+    // Otherwise propagate the child's own failure so `--watch` is transparent in a pipeline.
+    if let Some(code) = report.exit_code {
+        if code != 0 {
+            std::process::exit(code);
+        }
     }
     Ok(())
 }

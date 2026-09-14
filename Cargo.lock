@@ -394,6 +394,7 @@ dependencies = [
  "deprot-hygiene",
  "deprot-malware",
  "deprot-manifest",
+ "deprot-netmon",
  "deprot-policy",
  "deprot-reach",
  "deprot-report",
@@ -471,6 +472,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "deprot-netmon"
+version = "0.6.0"
+dependencies = [
+ "deprot-core",
+ "serde",
+]
+
+[[package]]
 name = "deprot-policy"
 version = "0.6.0"
 dependencies = [
@@ -499,6 +508,7 @@ dependencies = [
  "deprot-core",
  "deprot-hygiene",
  "deprot-malware",
+ "deprot-netmon",
  "deprot-reach",
  "deprot-secrets",
  "owo-colors",

@@ -17,6 +17,7 @@ deprot-actions = { workspace = true }
 deprot-hygiene = { workspace = true }
 deprot-reach = { workspace = true }
 deprot-malware = { workspace = true }
+deprot-netmon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 owo-colors = { workspace = true }

@@ -7,6 +7,7 @@ members = [
     "crates/deprot-hygiene",
     "crates/deprot-reach",
     "crates/deprot-malware",
+    "crates/deprot-netmon",
     "crates/deprot-manifest",
     "crates/deprot-collect",
     "crates/deprot-report",
@@ -34,6 +35,7 @@ deprot-actions = { path = "crates/deprot-actions", version = "0.6.0" }
 deprot-hygiene = { path = "crates/deprot-hygiene", version = "0.6.0" }
 deprot-reach = { path = "crates/deprot-reach", version = "0.6.0" }
 deprot-malware = { path = "crates/deprot-malware", version = "0.6.0" }
+deprot-netmon = { path = "crates/deprot-netmon", version = "0.6.0" }
 deprot-manifest = { path = "crates/deprot-manifest", version = "0.6.0" }
 deprot-collect = { path = "crates/deprot-collect", version = "0.6.0" }
 deprot-report = { path = "crates/deprot-report", version = "0.6.0" }
