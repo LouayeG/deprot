@@ -1,0 +1,16 @@
+[package]
+name = "deprot-reach"
+description = "Dependency reachability (used / unused / dev) analysis for deprot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+deprot-core = { workspace = true }
+serde = { workspace = true }
+regex = { workspace = true }

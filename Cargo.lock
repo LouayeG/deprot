@@ -466,6 +466,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deprot-reach"
+version = "0.5.0"
+dependencies = [
+ "deprot-core",
+ "regex",
+ "serde",
+]
+
+[[package]]
 name = "deprot-report"
 version = "0.5.0"
 dependencies = [
