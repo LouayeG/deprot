@@ -128,3 +128,46 @@ fn scoring_is_deterministic() {
     assert_eq!(a.tier, b.tier);
     assert_eq!(a.signals, b.signals);
 }
+
+/// Maturity dampener: a widely-used, complete library that's simply gone quiet (old release, no
+/// Scorecard) is "stable", not "rotting" — it must not fall to a D/F on staleness alone.
+#[test]
+fn mature_clean_stale_package_is_floored_to_caution() {
+    let facts = Facts {
+        latest_published: Some(now() - chrono::Duration::days(1200)), // very stale
+        releases_last_year: Some(0),
+        total_versions: Some(60), // mature / established
+        licenses: vec!["MIT".into()],
+        // no scorecard, no vulns, not deprecated/archived
+        ..Default::default()
+    };
+    let s = score(&facts, now());
+    assert!(
+        s.value >= 70,
+        "mature clean package should be floored, got {}",
+        s.value
+    );
+    assert_eq!(
+        s.tier,
+        Tier::Caution,
+        "stable but stale -> caution, not risky"
+    );
+    assert!(s.forced_reasons.is_empty());
+}
+
+/// The dampener must NOT rescue an immature, obscure, stale package — that really is a concern.
+#[test]
+fn young_obscure_stale_package_is_not_floored() {
+    let facts = Facts {
+        latest_published: Some(now() - chrono::Duration::days(1200)),
+        releases_last_year: Some(0),
+        total_versions: Some(2), // not mature, no popularity signal
+        ..Default::default()
+    };
+    let s = score(&facts, now());
+    assert!(
+        s.value < 70,
+        "immature stale package must not be floored, got {}",
+        s.value
+    );
+}

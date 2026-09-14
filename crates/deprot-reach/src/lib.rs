@@ -30,6 +30,9 @@ pub enum Reach {
     Unused,
     /// A dev/build/peer dependency (not evaluated for "unused").
     Dev,
+    /// This ecosystem has no source-import scanner yet, so reachability is unknown. Reported
+    /// honestly rather than assumed used — never counted as a removal candidate.
+    Unscanned,
 }
 
 /// One dependency with its reachability verdict.
@@ -168,14 +171,14 @@ pub fn classify(deps: &[Dependency], index: &ImportIndex) -> Vec<DepUsage> {
             if matches!(d.ecosystem, Ecosystem::Npm) && d.name.starts_with("@types/") {
                 return base(Reach::Dev, None);
             }
-            let (used, ev) = match d.ecosystem {
+            let usage = match d.ecosystem {
                 Ecosystem::Npm => {
                     let e = index.npm.get(&d.name).cloned();
-                    (e.is_some(), e)
+                    Some((e.is_some(), e))
                 }
                 Ecosystem::Cargo => {
                     // Crate path roots use underscores.
-                    (index.rust.contains(&d.name.replace('-', "_")), None)
+                    Some((index.rust.contains(&d.name.replace('-', "_")), None))
                 }
                 Ecosystem::Go => {
                     let prefix = format!("{}/", d.name);
@@ -183,16 +186,19 @@ pub fn classify(deps: &[Dependency], index: &ImportIndex) -> Vec<DepUsage> {
                         .go
                         .iter()
                         .find(|(p, _)| *p == d.name || p.starts_with(&prefix));
-                    (hit.is_some(), hit.map(|(_, f)| f.clone()))
+                    Some((hit.is_some(), hit.map(|(_, f)| f.clone())))
                 }
-                // No source scanner wired for these ecosystems: don't wrongly flag as unused.
+                // No source-import scanner wired for these ecosystems yet.
                 Ecosystem::PyPI
                 | Ecosystem::Ruby
                 | Ecosystem::Php
                 | Ecosystem::Maven
-                | Ecosystem::NuGet => (true, None),
+                | Ecosystem::NuGet => None,
             };
-            base(if used { Reach::Used } else { Reach::Unused }, ev)
+            match usage {
+                Some((used, ev)) => base(if used { Reach::Used } else { Reach::Unused }, ev),
+                None => base(Reach::Unscanned, None),
+            }
         })
         .collect()
 }

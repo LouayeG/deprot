@@ -259,7 +259,10 @@ pytest = "^7.0"
         let deps = PyprojectManifest.parse(toml_src).unwrap();
         assert!(deps.iter().any(|d| d.name == "flask" && d.direct));
         assert!(deps.iter().any(|d| d.name == "requests"));
-        assert!(!deps.iter().any(|d| d.name == "python"), "interpreter skipped");
+        assert!(
+            !deps.iter().any(|d| d.name == "python"),
+            "interpreter skipped"
+        );
         assert!(!deps.iter().find(|d| d.name == "pytest").unwrap().direct);
     }
 }

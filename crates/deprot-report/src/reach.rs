@@ -11,6 +11,7 @@ fn reach_rank(r: Reach) -> u8 {
         Reach::Unused => 0,
         Reach::Used => 1,
         Reach::Dev => 2,
+        Reach::Unscanned => 3,
     }
 }
 
@@ -19,6 +20,7 @@ fn reach_cell(r: Reach) -> Cell {
         Reach::Used => Cell::new("used").fg(Color::Green),
         Reach::Unused => Cell::new("UNUSED").fg(Color::Yellow),
         Reach::Dev => Cell::new("dev").fg(Color::DarkGrey),
+        Reach::Unscanned => Cell::new("unscanned").fg(Color::DarkGrey),
     }
 }
 
@@ -56,7 +58,11 @@ pub fn reach_summary(usages: &[DepUsage]) -> String {
     let used = usages.iter().filter(|u| u.reach == Reach::Used).count();
     let unused = usages.iter().filter(|u| u.reach == Reach::Unused).count();
     let dev = usages.iter().filter(|u| u.reach == Reach::Dev).count();
-    format!(
+    let unscanned = usages
+        .iter()
+        .filter(|u| u.reach == Reach::Unscanned)
+        .count();
+    let mut s = format!(
         "{} {} {}  {} {}  {} {}",
         "reachability:".bold(),
         used.to_string().green().bold(),
@@ -65,7 +71,16 @@ pub fn reach_summary(usages: &[DepUsage]) -> String {
         "unused (removal candidates)".yellow(),
         dev.to_string().dimmed(),
         "dev".dimmed(),
-    )
+    );
+    if unscanned > 0 {
+        // Be explicit that some ecosystems have no import scanner yet, rather than implying "used".
+        s.push_str(&format!(
+            "  {} {}",
+            unscanned.to_string().dimmed(),
+            "unscanned (no import scanner for this ecosystem yet)".dimmed(),
+        ));
+    }
+    s
 }
 
 #[derive(Serialize)]
@@ -74,6 +89,7 @@ struct SummaryOut {
     used: usize,
     unused: usize,
     dev: usize,
+    unscanned: usize,
 }
 
 #[derive(Serialize)]
@@ -94,6 +110,10 @@ pub fn reach_json(usages: &[DepUsage]) -> String {
             used: usages.iter().filter(|u| u.reach == Reach::Used).count(),
             unused: usages.iter().filter(|u| u.reach == Reach::Unused).count(),
             dev: usages.iter().filter(|u| u.reach == Reach::Dev).count(),
+            unscanned: usages
+                .iter()
+                .filter(|u| u.reach == Reach::Unscanned)
+                .count(),
         },
         dependencies: usages,
     };

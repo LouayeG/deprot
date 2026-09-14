@@ -94,6 +94,10 @@ pub struct Score {
 const CAUTION_BELOW: u8 = 80;
 const RISKY_BELOW: u8 = 55;
 
+/// Score floor for a mature, popular, otherwise-clean package (the maturity dampener). Lands at a
+/// low `C` / `CAUTION` — "stable but stale", never a false `OK`, never a rotting `F`.
+const MATURE_FLOOR: u8 = 70;
+
 /// Score one dependency from its [`Facts`] at reference time `now`.
 ///
 /// Pure and deterministic: no I/O, no ambient clock. Pass the same inputs, get the same output —
@@ -102,12 +106,24 @@ pub fn score(facts: &Facts, now: DateTime<Utc>) -> Score {
     let signals = signals::all(facts, now);
 
     let total_weight: f64 = signals.iter().map(|s| s.weight).sum();
-    let value = if total_weight <= 0.0 {
+    let mut value = if total_weight <= 0.0 {
         50 // no signals at all: neutral, not a false "perfect"
     } else {
         let weighted: f64 = signals.iter().map(|s| s.score * s.weight).sum();
         (weighted / total_weight * 100.0).round() as u8
     };
+
+    // Maturity dampener. A widely-used, complete library that simply hasn't shipped a release
+    // lately is *stable*, not *rotting* — yet staleness + a missing OpenSSF Scorecard alone can drag
+    // such a package to a D/F. When nothing is actively wrong (no advisories, not deprecated, not
+    // archived, and the package resolved), a mature/popular package earns a score floor so those
+    // two soft signals can't, by themselves, read as failing. It only ever lifts a score.
+    let clean =
+        !facts.is_unresolved() && !facts.deprecated && !facts.archived && facts.vulns.is_empty();
+    let mature = facts.total_versions.unwrap_or(0) >= 10 || facts.stars.unwrap_or(0) >= 1_000;
+    if clean && mature {
+        value = value.max(MATURE_FLOOR);
+    }
 
     // Base tier from the value.
     let mut tier = if value < RISKY_BELOW {
