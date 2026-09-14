@@ -482,6 +482,7 @@ dependencies = [
  "deprot-actions",
  "deprot-core",
  "deprot-hygiene",
+ "deprot-reach",
  "deprot-secrets",
  "owo-colors",
  "serde",
