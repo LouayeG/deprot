@@ -161,7 +161,7 @@ pub fn analyze(root: &Path) -> HygieneReport {
             ".github/renovate.json",
         ]),
         Severity::Low,
-        "enable Dependabot or Renovate to keep dependencies current",
+        "enable automated dependency-update PRs to keep dependencies current",
     ));
 
     // 8. CI configured.

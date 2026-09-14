@@ -7,7 +7,7 @@
 //! supply-chain attacks (compromised `postinstall` scripts, malicious build steps) exfiltrate.
 //!
 //! This is a *dynamic* complement to deprot's static analysis — the thing a "dependency rot" tool
-//! isn't expected to have, and something Snyk/Socket/Dependabot don't do locally, keyless.
+//! isn't expected to have, and something most dependency tooling doesn't do locally, keyless.
 //!
 //! Implemented on Linux via `/proc` (no root, no packet capture, no external crates). On other
 //! platforms [`watch`] returns an error.

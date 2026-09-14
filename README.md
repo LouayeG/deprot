@@ -124,8 +124,8 @@ The stuff cloud tools don't do locally — all free, all keyless:
   `/proc` — no root, no packet capture. A compromised `postinstall` that phones home, an **IMDS
   credential probe** (`169.254.169.254`), or any connection to a public host stands out immediately;
   loopback/LAN is ignored. `--json` for CI; exits non-zero on a metadata/external connection. This is
-  a *dynamic* check nobody expects from a "rot" tool — and that Snyk/Socket/Dependabot don't do
-  locally. (Linux.)
+  a *dynamic* check most dependency tooling doesn't do locally — and one nobody expects from a "rot"
+  tool. (Linux.)
 - 🎯 **`--reach` — is the risky dependency even used?** Scans your source imports and classifies each
   dependency as **used** (with the file it's imported in), **unused** (a runtime dep never imported —
   a removal candidate and needless attack surface), or **dev**. Finer than a runtime-vs-build split,

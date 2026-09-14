@@ -173,7 +173,7 @@ Each dependency is scored on weighted signals. All derived from §4 Facts; all c
 - A **GitHub Action** so repos gate PRs on `deprot --fail-on risky` → sticky adoption.
 - Launch post framing: *"I built a supply-chain risk engine that grades your dependencies in seconds —
   local, no keys, no cloud."* Lead with the xz/supply-chain anxiety angle.
-- Comparison table vs. cloud SaaS (Snyk/Socket): local-first, free, zero-signup, single binary.
+- Comparison table vs. cloud SaaS scanners: local-first, free, zero-signup, single binary.
 
 ---
 
