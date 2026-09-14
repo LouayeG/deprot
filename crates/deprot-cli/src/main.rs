@@ -11,10 +11,11 @@ use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::{Severity, Tier};
 use deprot_report::{
-    explain, hygiene_json, hygiene_summary, hygiene_table, secret_json, secret_sarif,
-    secret_summary, secret_table, summary_banner, table, to_json, to_json_packages, tree_summary,
-    tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table, workflow_json,
-    workflow_sarif, workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
+    explain, hygiene_json, hygiene_summary, hygiene_table, reach_json, reach_summary, reach_table,
+    secret_json, secret_sarif, secret_summary, secret_table, summary_banner, table, to_json,
+    to_json_packages, tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary,
+    vuln_table, workflow_json, workflow_sarif, workflow_summary, workflow_table, Row, TreeRow,
+    VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -68,6 +69,11 @@ struct Cli {
     /// CODEOWNERS — scored 0–100. Exits non-zero only on a serious gap (e.g. a committed credential).
     #[arg(long)]
     hygiene: bool,
+
+    /// Reachability: scan the source and classify each dependency as used (imported), unused (a
+    /// runtime dep never imported — a removal candidate), or dev. Advisory (does not fail CI).
+    #[arg(long)]
+    reach: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -201,6 +207,11 @@ async fn run() -> Result<()> {
     // Repository hygiene: score the project's security posture.
     if cli.hygiene {
         return run_hygiene(&cli);
+    }
+
+    // Reachability: which declared dependencies are actually imported.
+    if cli.reach {
+        return run_reach(&cli);
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -555,6 +566,42 @@ fn run_hygiene(cli: &Cli) -> Result<()> {
         .any(|c| !c.passed && c.severity >= Severity::High);
     if serious {
         std::process::exit(1);
+    }
+    Ok(())
+}
+
+/// Reachability audit: classify each declared dependency as used / unused / dev by scanning the
+/// project source for imports. Advisory (always exits 0) — unused runtime deps are removal
+/// candidates, not build failures. Pure filesystem work — no network.
+fn run_reach(cli: &Cli) -> Result<()> {
+    let detected = deprot_manifest::detect(&cli.path)
+        .with_context(|| format!("resolving target {}", cli.path.display()))?;
+    // Scan from the directory containing the manifest.
+    let root = if cli.path.is_dir() {
+        cli.path.clone()
+    } else {
+        detected
+            .path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from("."))
+    };
+
+    let usages = deprot_reach::analyze(&root, &detected.dependencies);
+
+    if cli.json {
+        println!("{}", reach_json(&usages));
+    } else {
+        eprintln!(
+            "{} {} reachability of {} dependencies in {} ...",
+            "deprot".bold(),
+            "checking".dimmed(),
+            detected.dependencies.len(),
+            root.display(),
+        );
+        println!("{}", reach_table(&usages));
+        println!();
+        println!("{}", reach_summary(&usages));
     }
     Ok(())
 }

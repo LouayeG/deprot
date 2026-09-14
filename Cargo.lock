@@ -394,6 +394,7 @@ dependencies = [
  "deprot-hygiene",
  "deprot-manifest",
  "deprot-policy",
+ "deprot-reach",
  "deprot-report",
  "deprot-secrets",
  "deprot-tui",
