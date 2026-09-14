@@ -24,6 +24,7 @@ CRATES=(
   deprot-hygiene
   deprot-reach
   deprot-malware
+  deprot-netmon
   deprot-manifest
   deprot-collect
   deprot-report
