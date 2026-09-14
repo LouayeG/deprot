@@ -8,6 +8,7 @@
 //! without the engine knowing anything about presentation.
 
 mod actions;
+mod badge;
 mod explain;
 mod hygiene;
 mod json;
@@ -24,6 +25,7 @@ mod vulns;
 use deprot_core::{Dependency, Score};
 
 pub use actions::{workflow_json, workflow_sarif, workflow_summary, workflow_table};
+pub use badge::{grade_badge_endpoint, grade_badge_svg};
 pub use explain::explain;
 pub use hygiene::{hygiene_json, hygiene_summary, hygiene_table};
 pub use json::{to_json, to_json_packages};

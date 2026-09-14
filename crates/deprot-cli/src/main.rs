@@ -11,12 +11,12 @@ use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::{Severity, Tier};
 use deprot_report::{
-    explain, hygiene_json, hygiene_summary, hygiene_table, malware_json, malware_sarif,
-    malware_summary, malware_table, netmon_json, netmon_summary, netmon_table, reach_json,
-    reach_summary, reach_table, secret_json, secret_sarif, secret_summary, secret_table,
-    summary_banner, table, to_json, to_json_packages, tree_summary, tree_table, tree_to_json,
-    vuln_json, vuln_sarif, vuln_summary, vuln_table, workflow_json, workflow_sarif,
-    workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
+    explain, grade_badge_endpoint, grade_badge_svg, hygiene_json, hygiene_summary, hygiene_table,
+    malware_json, malware_sarif, malware_summary, malware_table, netmon_json, netmon_summary,
+    netmon_table, reach_json, reach_summary, reach_table, secret_json, secret_sarif,
+    secret_summary, secret_table, summary_banner, table, to_json, to_json_packages, tree_summary,
+    tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table, workflow_json,
+    workflow_sarif, workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -118,6 +118,11 @@ struct Cli {
     /// Emit a CycloneDX 1.5 SBOM with deprot's risk assessment attached to each component.
     #[arg(long)]
     sbom: bool,
+
+    /// Emit an embeddable grade badge (SVG) for the project's overall grade — pipe it to a file and
+    /// reference it in your README. With --json, emit a shields.io endpoint JSON instead.
+    #[arg(long)]
+    badge: bool,
 
     /// Show a package's release history over time (a "time machine" of its cadence and staleness).
     #[arg(long, value_name = "PACKAGE")]
@@ -240,6 +245,11 @@ async fn run() -> Result<()> {
     // Runtime network monitoring: run a command and watch its outbound connections.
     if cli.watch {
         return run_watch(&cli);
+    }
+
+    // Grade badge: analyze the project and emit an embeddable badge.
+    if cli.badge {
+        return run_badge(&cli).await;
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -707,6 +717,50 @@ fn run_watch(cli: &Cli) -> Result<()> {
         if code != 0 {
             std::process::exit(code);
         }
+    }
+    Ok(())
+}
+
+/// Letter grade for a 0–100 value (mirrors the core grade thresholds).
+fn grade_letter(v: u8) -> &'static str {
+    match v {
+        90..=100 => "A",
+        75..=89 => "B",
+        60..=74 => "C",
+        40..=59 => "D",
+        _ => "F",
+    }
+}
+
+/// Grade badge: analyze the project and emit an embeddable SVG badge (or a shields.io endpoint JSON
+/// with --json) for the project's overall grade — the mean dependency score.
+async fn run_badge(cli: &Cli) -> Result<()> {
+    let detected = deprot_manifest::detect(&cli.path)
+        .with_context(|| format!("resolving target {}", cli.path.display()))?;
+    let mut deps = detected.dependencies;
+    if cli.prod_only {
+        deps.retain(|d| d.direct);
+    }
+    if deps.is_empty() {
+        return Err(anyhow!(
+            "no dependencies found in {}",
+            detected.path.display()
+        ));
+    }
+    let collector = collector_from(cli, false)?;
+    let now = Utc::now();
+    let values: Vec<u32> = collector
+        .collect_all(&deps)
+        .await
+        .iter()
+        .map(|c| deprot_core::score(&c.facts, now).value as u32)
+        .collect();
+    let mean = (values.iter().sum::<u32>() / values.len().max(1) as u32) as u8;
+    let grade = grade_letter(mean);
+    if cli.json {
+        println!("{}", grade_badge_endpoint(grade, mean));
+    } else {
+        println!("{}", grade_badge_svg(grade, mean));
     }
     Ok(())
 }

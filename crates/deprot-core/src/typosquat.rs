@@ -134,14 +134,96 @@ const POPULAR_GO: &[&str] = &[
     "gorm.io/gorm",
 ];
 
+const POPULAR_RUBY: &[&str] = &[
+    "rails",
+    "rake",
+    "bundler",
+    "rspec",
+    "puma",
+    "sinatra",
+    "nokogiri",
+    "devise",
+    "sidekiq",
+    "pg",
+    "mysql2",
+    "redis",
+    "faraday",
+    "rubocop",
+    "activerecord",
+    "actionpack",
+    "activesupport",
+    "json",
+    "minitest",
+    "capybara",
+    "webmock",
+    "kaminari",
+    "jbuilder",
+    "dotenv",
+    "httparty",
+    "pry",
+];
+
+const POPULAR_PHP: &[&str] = &[
+    "symfony/console",
+    "symfony/http-foundation",
+    "guzzlehttp/guzzle",
+    "monolog/monolog",
+    "laravel/framework",
+    "phpunit/phpunit",
+    "doctrine/orm",
+    "psr/log",
+    "twig/twig",
+    "ramsey/uuid",
+    "league/flysystem",
+    "fakerphp/faker",
+    "phpstan/phpstan",
+    "nikic/php-parser",
+];
+
+const POPULAR_MAVEN: &[&str] = &[
+    "com.google.guava:guava",
+    "org.apache.commons:commons-lang3",
+    "com.fasterxml.jackson.core:jackson-databind",
+    "org.slf4j:slf4j-api",
+    "junit:junit",
+    "org.springframework:spring-core",
+    "org.springframework.boot:spring-boot",
+    "com.squareup.okhttp3:okhttp",
+    "org.apache.logging.log4j:log4j-core",
+    "commons-io:commons-io",
+    "org.projectlombok:lombok",
+    "org.mockito:mockito-core",
+    "ch.qos.logback:logback-classic",
+];
+
+const POPULAR_NUGET: &[&str] = &[
+    "Newtonsoft.Json",
+    "Serilog",
+    "AutoMapper",
+    "Dapper",
+    "xunit",
+    "NUnit",
+    "Moq",
+    "FluentValidation",
+    "Polly",
+    "MediatR",
+    "Swashbuckle.AspNetCore",
+    "Microsoft.EntityFrameworkCore",
+    "NLog",
+    "RestSharp",
+    "FluentAssertions",
+];
+
 fn popular_for(eco: Ecosystem) -> &'static [&'static str] {
     match eco {
         Ecosystem::Npm => POPULAR_NPM,
         Ecosystem::Cargo => POPULAR_CARGO,
         Ecosystem::PyPI => POPULAR_PYPI,
         Ecosystem::Go => POPULAR_GO,
-        // No bundled popular-name list for these yet; typosquat radar is a no-op until one lands.
-        Ecosystem::Ruby | Ecosystem::Php | Ecosystem::Maven | Ecosystem::NuGet => &[],
+        Ecosystem::Ruby => POPULAR_RUBY,
+        Ecosystem::Php => POPULAR_PHP,
+        Ecosystem::Maven => POPULAR_MAVEN,
+        Ecosystem::NuGet => POPULAR_NUGET,
     }
 }
 
