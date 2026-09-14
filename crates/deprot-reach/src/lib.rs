@@ -163,6 +163,11 @@ pub fn classify(deps: &[Dependency], index: &ImportIndex) -> Vec<DepUsage> {
             if !d.direct {
                 return base(Reach::Dev, None);
             }
+            // `@types/*` packages are consumed by the TypeScript compiler, never imported at a call
+            // site — treat them as dev/implicit rather than falsely "unused".
+            if matches!(d.ecosystem, Ecosystem::Npm) && d.name.starts_with("@types/") {
+                return base(Reach::Dev, None);
+            }
             let (used, ev) = match d.ecosystem {
                 Ecosystem::Npm => {
                     let e = index.npm.get(&d.name).cloned();
@@ -305,6 +310,14 @@ mod tests {
         assert_eq!(by("@scope/pkg"), Reach::Used);
         assert_eq!(by("left-pad"), Reach::Unused);
         assert_eq!(by("jest"), Reach::Dev);
+    }
+
+    #[test]
+    fn types_packages_are_never_unused() {
+        let idx = ImportIndex::default();
+        let deps = vec![dep("@types/leaflet", Ecosystem::Npm, true)];
+        // Even as a runtime dep with no imports, @types/* is dev/implicit, not unused.
+        assert_eq!(classify(&deps, &idx)[0].reach, Reach::Dev);
     }
 
     #[test]
