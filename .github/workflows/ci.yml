@@ -32,3 +32,28 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+  msrv:
+    name: msrv (1.90)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned MSRV toolchain
+        uses: dtolnay/rust-toolchain@1.90.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Build on the declared minimum supported Rust version
+        run: cargo build --workspace
+
+  dogfood:
+    name: dogfood (deprot scans itself)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the binary
+        run: cargo build --release --bin deprot
+      - name: Scan our own source for malicious-code patterns
+        run: ./target/release/deprot --malware .
+      - name: Score our own repository hygiene
+        run: ./target/release/deprot --hygiene .
