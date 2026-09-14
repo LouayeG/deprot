@@ -60,13 +60,14 @@ cargo install deprot
 ```bash
 deprot                      # grade the project in the current directory
 deprot ./package.json       # or a specific manifest
-deprot --recursive          # monorepo? grade every subproject (npm + Cargo + Go)
+deprot --recursive          # monorepo? grade every subproject across all 8 ecosystems
 deprot --vulns              # vuln-first: every CVE, its severity, and the fix version
 deprot --secrets            # scan your own source for leaked API keys / tokens / private keys
 deprot --workflows          # audit .github/workflows for CI supply-chain risks
 deprot --hygiene            # score the repo's security posture (0–100)
 deprot --reach              # which deps are actually imported? (find unused ones)
-deprot --malware            # scan source for dropper / malicious-code signatures
+deprot --malware            # AST-aware scan for dropper / malicious-code signatures
+deprot --watch -- npm ci    # run an install/build & flag every outbound connection it makes
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -107,12 +108,23 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
-- ☣️ **`--malware` — catch code that shouldn't be there.** Scans source for the specific signatures of
-  supply-chain malware and droppers — **obfuscated `eval`** (running a base64/hex decode), **reverse
-  shells** (`/dev/tcp`, `nc -e`, `bash -i`), **`curl | sh`**, **cloud-metadata (IMDS) credential
-  probes** (`169.254.169.254`), **credential-file access** (`~/.aws/credentials`, SSH keys, `.npmrc`,
-  browser stores), heavy **obfuscation**, and **history tampering** — tuned for low false positives.
-  `--json` / `--sarif`; fails CI on a high/critical hit.
+- ☣️ **`--malware` — catch code that shouldn't be there, with a real parser.** For JS/TS/Python it
+  parses the source with **tree-sitter** and confirms the dropper pattern *structurally*: an
+  **`eval`/`exec` on a decoded or concatenated payload** is flagged even when it's spread across
+  newlines or built by string-concat — and, crucially, it is **not** flagged when the scary-looking
+  text only appears inside a string or comment (the classic regex false positive). Every finding is
+  tagged `AST` (parser-confirmed) or `regex` (heuristic). The regex layer still covers **reverse
+  shells** (`/dev/tcp`, `nc -e`, `bash -i`), **`curl | sh`**, **cloud-metadata (IMDS) probes**
+  (`169.254.169.254`), **credential-file access** (`~/.aws/credentials`, SSH keys, `.npmrc`, browser
+  stores), heavy **obfuscation**, and **history tampering**. `--json` / `--sarif`; fails CI on a
+  high/critical hit.
+- 📡 **`--watch` — see what an install actually does.** `deprot --watch -- npm install` runs the
+  command and **monitors every outbound connection its process tree makes**, in real time, from
+  `/proc` — no root, no packet capture. A compromised `postinstall` that phones home, an **IMDS
+  credential probe** (`169.254.169.254`), or any connection to a public host stands out immediately;
+  loopback/LAN is ignored. `--json` for CI; exits non-zero on a metadata/external connection. This is
+  a *dynamic* check nobody expects from a "rot" tool — and that Snyk/Socket/Dependabot don't do
+  locally. (Linux.)
 - 🎯 **`--reach` — is the risky dependency even used?** Scans your source imports and classifies each
   dependency as **used** (with the file it's imported in), **unused** (a runtime dep never imported —
   a removal candidate and needless attack surface), or **dev**. Finer than a runtime-vs-build split,
@@ -181,8 +193,13 @@ number is their weighted average (a missing data source lowers confidence, it do
 |--------|:----:|----------|
 | [deps.dev](https://deps.dev) | none | releases, licenses, advisories, linked repo, OpenSSF Scorecard |
 | [OSV.dev](https://osv.dev) | none | vulnerabilities — CVE aliases, CVSS vectors, fixed versions (merged with deps.dev/GitHub advisories) |
-| npm / crates.io / PyPI / Go | none | publish metadata, maintainers/owners, install scripts |
+| npm / crates.io / PyPI / Go / RubyGems / Maven / NuGet | none | publish metadata, maintainers/owners, install scripts |
 | GitHub API | *optional* token | deeper repo signals — never required |
+
+**Ecosystems (8):** npm, crates.io, PyPI, Go, RubyGems, Packagist (PHP), Maven, and NuGet — parsed
+from their manifests (`package.json`, `Cargo.toml`, `go.mod`, `Gemfile`, `composer.json`, `pom.xml`,
+`*.csproj`/`packages.config`) and, where present, their lockfiles for exact versions. deps.dev
+doesn't index Packagist, so PHP vulnerabilities come straight from OSV.
 
 Results are cached on disk (24h TTL) so re-runs are instant and polite to the APIs.
 
@@ -247,8 +264,9 @@ cargo test --workspace     # the whole suite runs offline
 
 ## Roadmap
 
-PyPI adapter · deep tarball capability scanning · bundled offline OSV mirror · SBOM ingest · a grade
-badge you can embed in your own README. PRs welcome — new ecosystems are the easiest place to start.
+Deep tarball capability scanning · bundled offline OSV mirror · SBOM ingest · a grade badge you can
+embed in your own README · maintainer/typosquat data for the newer ecosystems · `--watch` on macOS.
+PRs welcome — new ecosystems are the easiest place to start.
 
 ## License
 
