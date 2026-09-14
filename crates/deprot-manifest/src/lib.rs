@@ -17,6 +17,7 @@ mod maven;
 mod npm;
 mod nuget;
 mod php;
+mod python;
 mod ruby;
 
 pub use cargo::CargoManifest;
@@ -27,6 +28,7 @@ pub use maven::MavenManifest;
 pub use npm::NpmManifest;
 pub use nuget::NuGetManifest;
 pub use php::PhpManifest;
+pub use python::{PyprojectManifest, RequirementsManifest};
 pub use ruby::RubyManifest;
 
 /// A parser for one ecosystem's manifest format.
@@ -42,6 +44,8 @@ const CANDIDATES: &[(&str, Ecosystem)] = &[
     ("package.json", Ecosystem::Npm),
     ("Cargo.toml", Ecosystem::Cargo),
     ("go.mod", Ecosystem::Go),
+    ("pyproject.toml", Ecosystem::PyPI),
+    ("requirements.txt", Ecosystem::PyPI),
     ("Gemfile", Ecosystem::Ruby),
     ("composer.json", Ecosystem::Php),
     ("pom.xml", Ecosystem::Maven),
@@ -107,6 +111,8 @@ fn parser_for(path: &Path) -> Option<Box<dyn Manifest>> {
         "package.json" => return Some(Box::new(NpmManifest)),
         "Cargo.toml" => return Some(Box::new(CargoManifest)),
         "go.mod" => return Some(Box::new(GoManifest)),
+        "pyproject.toml" => return Some(Box::new(PyprojectManifest)),
+        "requirements.txt" => return Some(Box::new(RequirementsManifest)),
         "Gemfile" => return Some(Box::new(RubyManifest)),
         "composer.json" => return Some(Box::new(PhpManifest)),
         "pom.xml" => return Some(Box::new(MavenManifest)),
