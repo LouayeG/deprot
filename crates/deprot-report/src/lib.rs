@@ -11,6 +11,7 @@ mod actions;
 mod explain;
 mod hygiene;
 mod json;
+mod malware;
 mod reach;
 mod sarif;
 mod sbom;
@@ -25,6 +26,7 @@ pub use actions::{workflow_json, workflow_sarif, workflow_summary, workflow_tabl
 pub use explain::explain;
 pub use hygiene::{hygiene_json, hygiene_summary, hygiene_table};
 pub use json::{to_json, to_json_packages};
+pub use malware::{malware_json, malware_sarif, malware_summary, malware_table};
 pub use reach::{reach_json, reach_summary, reach_table};
 pub use sarif::to_sarif;
 pub use sbom::to_cyclonedx;
