@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/LouayeG/deprot"
@@ -29,18 +29,18 @@ categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
 # internal (path + version so each crate is publishable to crates.io)
-deprot-core = { path = "crates/deprot-core", version = "0.6.0" }
-deprot-secrets = { path = "crates/deprot-secrets", version = "0.6.0" }
-deprot-actions = { path = "crates/deprot-actions", version = "0.6.0" }
-deprot-hygiene = { path = "crates/deprot-hygiene", version = "0.6.0" }
-deprot-reach = { path = "crates/deprot-reach", version = "0.6.0" }
-deprot-malware = { path = "crates/deprot-malware", version = "0.6.0" }
-deprot-netmon = { path = "crates/deprot-netmon", version = "0.6.0" }
-deprot-manifest = { path = "crates/deprot-manifest", version = "0.6.0" }
-deprot-collect = { path = "crates/deprot-collect", version = "0.6.0" }
-deprot-report = { path = "crates/deprot-report", version = "0.6.0" }
-deprot-policy = { path = "crates/deprot-policy", version = "0.6.0" }
-deprot-tui = { path = "crates/deprot-tui", version = "0.6.0" }
+deprot-core = { path = "crates/deprot-core", version = "0.7.0" }
+deprot-secrets = { path = "crates/deprot-secrets", version = "0.7.0" }
+deprot-actions = { path = "crates/deprot-actions", version = "0.7.0" }
+deprot-hygiene = { path = "crates/deprot-hygiene", version = "0.7.0" }
+deprot-reach = { path = "crates/deprot-reach", version = "0.7.0" }
+deprot-malware = { path = "crates/deprot-malware", version = "0.7.0" }
+deprot-netmon = { path = "crates/deprot-netmon", version = "0.7.0" }
+deprot-manifest = { path = "crates/deprot-manifest", version = "0.7.0" }
+deprot-collect = { path = "crates/deprot-collect", version = "0.7.0" }
+deprot-report = { path = "crates/deprot-report", version = "0.7.0" }
+deprot-policy = { path = "crates/deprot-policy", version = "0.7.0" }
+deprot-tui = { path = "crates/deprot-tui", version = "0.7.0" }
 # external
 anyhow = "1"
 thiserror = "1"
