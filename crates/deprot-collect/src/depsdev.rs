@@ -173,7 +173,12 @@ impl DepsDev {
             .get_json(&format!("{BASE}/systems/{system}/packages/{enc}"))
             .await?;
         let Some(pkg) = pkg else {
-            // Unknown package (e.g. a local/workspace crate): return empty facts.
+            // deps.dev doesn't index this package/system (e.g. an unknown package, or Packagist,
+            // which deps.dev doesn't cover). Still record the pinned version so the caller's OSV
+            // lookup can query it — that's how PHP gets vulnerabilities.
+            if let Some(v) = pin {
+                facts.analyzed_version = Some(v.to_string());
+            }
             return Ok(facts);
         };
 

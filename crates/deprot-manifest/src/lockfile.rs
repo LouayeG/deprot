@@ -24,6 +24,8 @@ pub struct ResolvedGraph {
 const LOCKFILES: &[(&str, Ecosystem)] = &[
     ("Cargo.lock", Ecosystem::Cargo),
     ("package-lock.json", Ecosystem::Npm),
+    ("composer.lock", Ecosystem::Php),
+    ("Gemfile.lock", Ecosystem::Ruby),
 ];
 
 /// Resolve a target path (a lockfile, or a directory containing one) into a dependency graph.
@@ -65,6 +67,15 @@ pub fn detect_lockfile(path: &Path) -> Result<ResolvedGraph> {
             Ecosystem::Npm,
             parse_npm_lock(&contents).context("parsing npm lockfile")?,
         ),
+        Some(Ecosystem::Php) => (
+            Ecosystem::Php,
+            parse_composer_lock(&contents, direct_names(&lock_path, Ecosystem::Php))
+                .context("parsing composer lockfile")?,
+        ),
+        Some(Ecosystem::Ruby) => (
+            Ecosystem::Ruby,
+            parse_gemfile_lock(&contents).context("parsing Gemfile lockfile")?,
+        ),
         _ => return Err(anyhow!("unrecognized lockfile: {}", lock_path.display())),
     };
 
@@ -80,6 +91,7 @@ pub fn detect_lockfile(path: &Path) -> Result<ResolvedGraph> {
 fn direct_names(lock_path: &Path, eco: Ecosystem) -> BTreeSet<String> {
     let manifest = match eco {
         Ecosystem::Cargo => "Cargo.toml",
+        Ecosystem::Php => "composer.json",
         _ => return BTreeSet::new(),
     };
     let Some(dir) = lock_path.parent() else {
@@ -103,13 +115,19 @@ fn recognize(name: &str, contents: &str) -> Option<Ecosystem> {
     match name {
         "Cargo.lock" => return Some(Ecosystem::Cargo),
         "package-lock.json" => return Some(Ecosystem::Npm),
+        "composer.lock" => return Some(Ecosystem::Php),
+        "Gemfile.lock" => return Some(Ecosystem::Ruby),
         _ => {}
     }
     let trimmed = contents.trim_start();
     if trimmed.starts_with('{') && contents.contains("lockfileVersion") {
         Some(Ecosystem::Npm)
+    } else if trimmed.starts_with('{') && contents.contains("\"packages\"") {
+        Some(Ecosystem::Php)
     } else if contents.contains("[[package]]") {
         Some(Ecosystem::Cargo)
+    } else if contents.contains("GEM\n") && contents.contains("specs:") {
+        Some(Ecosystem::Ruby)
     } else {
         None
     }
@@ -282,6 +300,180 @@ fn npm_name_from_path(path: &str) -> String {
     tail.to_string()
 }
 
+// ---- composer.lock (PHP / Packagist) ----
+
+#[derive(Deserialize)]
+struct ComposerLock {
+    #[serde(default)]
+    packages: Vec<ComposerPackage>,
+    #[serde(default, rename = "packages-dev")]
+    packages_dev: Vec<ComposerPackage>,
+}
+
+#[derive(Deserialize)]
+struct ComposerPackage {
+    name: String,
+    version: String,
+    #[serde(default)]
+    require: BTreeMap<String, String>,
+}
+
+/// Whether a composer requirement is a platform / pseudo package (not a real Packagist node).
+fn composer_is_platform(name: &str) -> bool {
+    name == "php"
+        || name == "composer"
+        || name.starts_with("ext-")
+        || name.starts_with("lib-")
+        || name.starts_with("php-")
+        || name.starts_with("composer-")
+        || !name.contains('/') // real Packagist ids are always vendor/package
+}
+
+/// Parse `composer.lock`. `direct` (from `composer.json`) marks top-level requires; everything in
+/// `packages-dev` is treated as a dev dependency. Versions keep any leading `v`. Edges come from each
+/// package's `require` map (platform requirements excluded).
+fn parse_composer_lock(contents: &str, direct: BTreeSet<String>) -> Result<DepGraph> {
+    let lock: ComposerLock = serde_json::from_str(contents)?;
+    let mut graph = DepGraph::new();
+    let mut by_name: HashMap<String, usize> = HashMap::new();
+
+    let mut all: Vec<(ComposerPackage, bool)> = Vec::new();
+    for p in lock.packages {
+        let is_direct = direct.contains(&p.name);
+        all.push((p, is_direct));
+    }
+    for p in lock.packages_dev {
+        all.push((p, false)); // dev deps are never "direct" runtime deps
+    }
+
+    for (p, is_direct) in &all {
+        let idx = graph.add_node(DepNode {
+            name: p.name.clone(),
+            version: p.version.trim_start_matches('v').to_string(),
+            ecosystem: Ecosystem::Php,
+            direct: *is_direct,
+        });
+        by_name.entry(p.name.clone()).or_insert(idx);
+    }
+
+    for (p, _) in &all {
+        let Some(&from) = by_name.get(&p.name) else {
+            continue;
+        };
+        for dep_name in p.require.keys() {
+            if composer_is_platform(dep_name) {
+                continue;
+            }
+            if let Some(&to) = by_name.get(dep_name) {
+                graph.add_edge(from, to);
+            }
+        }
+    }
+
+    Ok(graph)
+}
+
+// ---- Gemfile.lock (Ruby / RubyGems) ----
+
+/// Parse bundler's `Gemfile.lock`. The `GEM > specs:` section lists every resolved gem
+/// (`name (version)`) and, indented under it, its runtime dependencies; the `DEPENDENCIES` section
+/// lists the direct (top-level) gems. Blast-radius edges are built from the spec dependency lines.
+fn parse_gemfile_lock(contents: &str) -> Result<DepGraph> {
+    let mut graph = DepGraph::new();
+    let mut by_name: HashMap<String, usize> = HashMap::new();
+    // (spec_name -> its listed dependency names)
+    let mut edges: Vec<(String, String)> = Vec::new();
+    let mut direct: BTreeSet<String> = BTreeSet::new();
+
+    let mut section = ""; // "specs" | "deps" | ""
+    let mut current_spec: Option<String> = None;
+
+    for raw in contents.lines() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let indent = raw.len() - raw.trim_start().len();
+
+        // Section headers sit at column 0 (or `  specs:` at indent 2 inside GEM).
+        if indent == 0 {
+            section = match trimmed {
+                "DEPENDENCIES" => "deps",
+                "GEM" | "GIT" | "PATH" => "gem",
+                _ => "",
+            };
+            current_spec = None;
+            continue;
+        }
+
+        match section {
+            "gem" => {
+                if trimmed == "specs:" {
+                    section = "specs";
+                }
+            }
+            "specs" => {
+                // 4-space indent: a resolved gem `name (version)`. 6-space: its dependency.
+                if indent <= 4 {
+                    if let Some((name, version)) = parse_spec_line(trimmed) {
+                        let idx = *by_name.entry(name.clone()).or_insert_with(|| {
+                            graph.add_node(DepNode {
+                                name: name.clone(),
+                                version,
+                                ecosystem: Ecosystem::Ruby,
+                                direct: false,
+                            })
+                        });
+                        let _ = idx;
+                        current_spec = Some(name);
+                    }
+                } else if let Some(spec) = &current_spec {
+                    // Dependency line: `name (constraint)` — keep just the name.
+                    let dep = trimmed.split_whitespace().next().unwrap_or("").to_string();
+                    if !dep.is_empty() {
+                        edges.push((spec.clone(), dep));
+                    }
+                }
+            }
+            "deps" => {
+                let name = trimmed
+                    .trim_end_matches('!')
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if !name.is_empty() {
+                    direct.insert(name);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Apply direct flags now that DEPENDENCIES is known.
+    for name in &direct {
+        if let Some(&idx) = by_name.get(name) {
+            graph.nodes_mut()[idx].direct = true;
+        }
+    }
+    for (from, to) in edges {
+        if let (Some(&f), Some(&t)) = (by_name.get(&from), by_name.get(&to)) {
+            graph.add_edge(f, t);
+        }
+    }
+
+    Ok(graph)
+}
+
+/// Parse a `name (version)` spec line into its parts.
+fn parse_spec_line(line: &str) -> Option<(String, String)> {
+    let (name, rest) = line.split_once(" (")?;
+    let version = rest.trim_end_matches(')').trim().to_string();
+    // Platform-suffixed versions like `1.2.3-x86_64-linux` -> keep the semver head.
+    let version = version.split('-').next().unwrap_or(&version).to_string();
+    Some((name.trim().to_string(), version))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,5 +541,70 @@ mod tests {
         let lock = r#"{ "lockfileVersion": 3, "packages": {} }"#;
         let g = parse_npm_lock(lock).unwrap();
         assert!(g.is_empty());
+    }
+
+    #[test]
+    fn composer_lock_builds_graph_with_edges_and_dev() {
+        let lock = r#"{
+            "packages": [
+                {"name": "monolog/monolog", "version": "3.5.0",
+                 "require": {"php": ">=8.1", "psr/log": "^3.0"}},
+                {"name": "psr/log", "version": "3.0.0", "require": {"php": ">=8.0"}}
+            ],
+            "packages-dev": [
+                {"name": "phpunit/phpunit", "version": "10.5.0", "require": {}}
+            ]
+        }"#;
+        let mut direct = BTreeSet::new();
+        direct.insert("monolog/monolog".to_string());
+        let g = parse_composer_lock(lock, direct).unwrap();
+        assert_eq!(g.len(), 3);
+        let idx = |name: &str| g.nodes().iter().position(|n| n.name == name).unwrap();
+        assert!(g.nodes()[idx("monolog/monolog")].direct);
+        assert!(!g.nodes()[idx("psr/log")].direct, "transitive");
+        assert!(!g.nodes()[idx("phpunit/phpunit")].direct, "dev");
+        // monolog -> psr/log gives psr/log a blast radius of 1 (platform `php` is ignored).
+        assert_eq!(g.blast_radii()[idx("psr/log")], 1);
+    }
+
+    #[test]
+    fn gemfile_lock_builds_graph_with_direct_and_edges() {
+        let lock = r#"GEM
+  remote: https://rubygems.org/
+  specs:
+    actionpack (7.0.4)
+      rack (~> 2.0)
+    rack (2.2.4)
+    nokogiri (1.15.0-x86_64-linux)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  actionpack (~> 7.0)
+  nokogiri!
+
+BUNDLED WITH
+   2.4.10
+"#;
+        let g = parse_gemfile_lock(lock).unwrap();
+        assert_eq!(g.len(), 3);
+        let idx = |name: &str| g.nodes().iter().position(|n| n.name == name).unwrap();
+        assert!(
+            g.nodes()[idx("actionpack")].direct,
+            "listed in DEPENDENCIES"
+        );
+        assert!(g.nodes()[idx("nokogiri")].direct, "`!` suffix still direct");
+        assert!(!g.nodes()[idx("rack")].direct, "transitive only");
+        assert_eq!(
+            g.nodes()[idx("nokogiri")].version,
+            "1.15.0",
+            "platform suffix stripped"
+        );
+        assert_eq!(
+            g.blast_radii()[idx("rack")],
+            1,
+            "actionpack depends on rack"
+        );
     }
 }

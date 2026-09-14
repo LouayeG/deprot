@@ -185,8 +185,12 @@ pub fn classify(deps: &[Dependency], index: &ImportIndex) -> Vec<DepUsage> {
                         .find(|(p, _)| *p == d.name || p.starts_with(&prefix));
                     (hit.is_some(), hit.map(|(_, f)| f.clone()))
                 }
-                // No source scanner wired for this ecosystem: don't wrongly flag as unused.
-                Ecosystem::PyPI => (true, None),
+                // No source scanner wired for these ecosystems: don't wrongly flag as unused.
+                Ecosystem::PyPI
+                | Ecosystem::Ruby
+                | Ecosystem::Php
+                | Ecosystem::Maven
+                | Ecosystem::NuGet => (true, None),
             };
             base(if used { Reach::Used } else { Reach::Unused }, ev)
         })

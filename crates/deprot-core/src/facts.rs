@@ -17,16 +17,52 @@ pub enum Ecosystem {
     Cargo,
     PyPI,
     Go,
+    Ruby,
+    Php,
+    Maven,
+    NuGet,
 }
 
 impl Ecosystem {
-    /// The identifier deps.dev uses for this ecosystem (their "system" path segment).
+    /// Every ecosystem deprot knows about, in a stable order.
+    pub const ALL: [Ecosystem; 8] = [
+        Ecosystem::Npm,
+        Ecosystem::Cargo,
+        Ecosystem::PyPI,
+        Ecosystem::Go,
+        Ecosystem::Ruby,
+        Ecosystem::Php,
+        Ecosystem::Maven,
+        Ecosystem::NuGet,
+    ];
+
+    /// The identifier deps.dev uses for this ecosystem (their "system" path segment). deps.dev does
+    /// not cover Packagist; PHP relies on OSV for vulnerabilities and gets no deps.dev enrichment
+    /// (the lookup 404s and is ignored).
     pub fn deps_dev_system(self) -> &'static str {
         match self {
             Ecosystem::Npm => "npm",
             Ecosystem::Cargo => "cargo",
             Ecosystem::PyPI => "pypi",
             Ecosystem::Go => "go",
+            Ecosystem::Ruby => "rubygems",
+            Ecosystem::Php => "packagist", // unsupported upstream; kept for a stable, harmless URL
+            Ecosystem::Maven => "maven",
+            Ecosystem::NuGet => "nuget",
+        }
+    }
+
+    /// The identifier [OSV.dev](https://osv.dev) uses for this ecosystem.
+    pub fn osv_ecosystem(self) -> &'static str {
+        match self {
+            Ecosystem::Npm => "npm",
+            Ecosystem::Cargo => "crates.io",
+            Ecosystem::PyPI => "PyPI",
+            Ecosystem::Go => "Go",
+            Ecosystem::Ruby => "RubyGems",
+            Ecosystem::Php => "Packagist",
+            Ecosystem::Maven => "Maven",
+            Ecosystem::NuGet => "NuGet",
         }
     }
 
@@ -37,6 +73,10 @@ impl Ecosystem {
             Ecosystem::Cargo => "crates.io",
             Ecosystem::PyPI => "PyPI",
             Ecosystem::Go => "Go",
+            Ecosystem::Ruby => "RubyGems",
+            Ecosystem::Php => "Packagist",
+            Ecosystem::Maven => "Maven",
+            Ecosystem::NuGet => "NuGet",
         }
     }
 }

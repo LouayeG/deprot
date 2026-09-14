@@ -13,13 +13,21 @@ mod cargo;
 mod go;
 mod installed;
 mod lockfile;
+mod maven;
 mod npm;
+mod nuget;
+mod php;
+mod ruby;
 
 pub use cargo::CargoManifest;
 pub use go::GoManifest;
 pub use installed::{scan_installed, InstalledOptions, InstalledScan};
 pub use lockfile::{detect_lockfile, ResolvedGraph};
+pub use maven::MavenManifest;
 pub use npm::NpmManifest;
+pub use nuget::NuGetManifest;
+pub use php::PhpManifest;
+pub use ruby::RubyManifest;
 
 /// A parser for one ecosystem's manifest format.
 pub trait Manifest {
@@ -34,6 +42,11 @@ const CANDIDATES: &[(&str, Ecosystem)] = &[
     ("package.json", Ecosystem::Npm),
     ("Cargo.toml", Ecosystem::Cargo),
     ("go.mod", Ecosystem::Go),
+    ("Gemfile", Ecosystem::Ruby),
+    ("composer.json", Ecosystem::Php),
+    ("pom.xml", Ecosystem::Maven),
+    ("packages.config", Ecosystem::NuGet),
+    // NuGet `.csproj` files have project-specific names and are matched by extension separately.
     // Additional ecosystems (requirements.txt, ...) are registered here as their adapters land.
 ];
 
@@ -55,6 +68,7 @@ pub fn detect(path: &Path) -> Result<Detected> {
             .iter()
             .map(|(name, _)| path.join(name))
             .find(|p| p.exists())
+            .or_else(|| find_csproj(path))
             .ok_or_else(|| {
                 anyhow!(
                     "no supported manifest found in {} (looked for: {})",
@@ -90,11 +104,32 @@ pub fn detect(path: &Path) -> Result<Detected> {
 fn parser_for(path: &Path) -> Option<Box<dyn Manifest>> {
     let name = path.file_name()?.to_str()?;
     match name {
-        "package.json" => Some(Box::new(NpmManifest)),
-        "Cargo.toml" => Some(Box::new(CargoManifest)),
-        "go.mod" => Some(Box::new(GoManifest)),
-        _ => None,
+        "package.json" => return Some(Box::new(NpmManifest)),
+        "Cargo.toml" => return Some(Box::new(CargoManifest)),
+        "go.mod" => return Some(Box::new(GoManifest)),
+        "Gemfile" => return Some(Box::new(RubyManifest)),
+        "composer.json" => return Some(Box::new(PhpManifest)),
+        "pom.xml" => return Some(Box::new(MavenManifest)),
+        "packages.config" => return Some(Box::new(NuGetManifest)),
+        _ => {}
     }
+    // SDK-style NuGet project files carry a project-specific `<name>.csproj`.
+    if path.extension().and_then(|e| e.to_str()) == Some("csproj") {
+        return Some(Box::new(NuGetManifest));
+    }
+    None
+}
+
+/// The first `.csproj` file in `dir`, if any (name-sorted for determinism).
+fn find_csproj(dir: &Path) -> Option<PathBuf> {
+    let mut hits: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("csproj"))
+        .collect();
+    hits.sort();
+    hits.into_iter().next()
 }
 
 /// Default recursion depth for [`discover`]. Deep enough for `packages/<name>/` monorepo layouts,
@@ -140,6 +175,9 @@ fn discover_walk(dir: &Path, depth: usize, max_depth: usize, out: &mut Vec<PathB
         if p.is_file() {
             out.push(p);
         }
+    }
+    if let Some(csproj) = find_csproj(dir) {
+        out.push(csproj);
     }
     if depth >= max_depth {
         return;

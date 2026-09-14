@@ -18,8 +18,14 @@ pub async fn enrich(
     match ecosystem {
         Ecosystem::Npm => enrich_npm(http, name, facts).await,
         Ecosystem::Cargo => enrich_crates(http, name, facts).await,
-        Ecosystem::PyPI => Ok(()), // PyPI maintainer data requires auth; skipped for now.
-        Ecosystem::Go => Ok(()),   // Go has no per-package maintainer registry to enrich from.
+        // No keyless per-package maintainer feed wired for these yet — PyPI/RubyGems require auth,
+        // Go has no registry, and Packagist/Maven/NuGet enrichment is future work.
+        Ecosystem::PyPI
+        | Ecosystem::Go
+        | Ecosystem::Ruby
+        | Ecosystem::Php
+        | Ecosystem::Maven
+        | Ecosystem::NuGet => Ok(()),
     }
 }
 

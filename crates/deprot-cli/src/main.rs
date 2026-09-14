@@ -1231,6 +1231,16 @@ async fn print_fix_plan(collector: &Collector, rows: &[TreeRow], now: chrono::Da
                     format!("pip install -U {}=={}", r.name, latest_ver)
                 }
                 deprot_core::Ecosystem::Go => format!("go get {}@{}", r.name, latest_ver),
+                deprot_core::Ecosystem::Ruby => format!("bundle update {}", r.name),
+                deprot_core::Ecosystem::Php => {
+                    format!("composer require {}:{}", r.name, latest_ver)
+                }
+                deprot_core::Ecosystem::Maven => {
+                    format!("update {} to {} in pom.xml", r.name, latest_ver)
+                }
+                deprot_core::Ecosystem::NuGet => {
+                    format!("dotnet add package {} --version {}", r.name, latest_ver)
+                }
             };
             plan.push(format!(
                 "  {} {} {} → {}  (grade {}→{})   {}",

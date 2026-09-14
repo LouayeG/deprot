@@ -13,16 +13,6 @@ use std::collections::HashSet;
 
 const QUERY_URL: &str = "https://api.osv.dev/v1/query";
 
-/// OSV's ecosystem identifier for a deprot [`Ecosystem`] (note: not the same strings as deps.dev).
-fn osv_ecosystem(eco: Ecosystem) -> &'static str {
-    match eco {
-        Ecosystem::Npm => "npm",
-        Ecosystem::Cargo => "crates.io",
-        Ecosystem::PyPI => "PyPI",
-        Ecosystem::Go => "Go",
-    }
-}
-
 // ---- wire types (only the fields deprot consumes) ----
 
 #[derive(Deserialize)]
@@ -168,7 +158,7 @@ fn min_fix(a: Option<String>, b: Option<String>) -> Option<String> {
 async fn query(http: &Client, eco: Ecosystem, name: &str, version: &str) -> Option<Vec<Vuln>> {
     let body = serde_json::json!({
         "version": version,
-        "package": { "name": name, "ecosystem": osv_ecosystem(eco) },
+        "package": { "name": name, "ecosystem": eco.osv_ecosystem() },
     });
     let resp = http.post(QUERY_URL).json(&body).send().await.ok()?;
     if !resp.status().is_success() {

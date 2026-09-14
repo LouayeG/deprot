@@ -44,10 +44,17 @@ pub fn to_cyclonedx(rows: &[Row]) -> String {
 fn purl(r: &Row) -> String {
     use deprot_core::Ecosystem;
     let v = r.analyzed_version.as_deref().unwrap_or("");
+    let name = &r.dependency.name;
     match r.dependency.ecosystem {
-        Ecosystem::Npm => format!("pkg:npm/{}@{}", r.dependency.name, v),
-        Ecosystem::Cargo => format!("pkg:cargo/{}@{}", r.dependency.name, v),
-        Ecosystem::PyPI => format!("pkg:pypi/{}@{}", r.dependency.name, v),
-        Ecosystem::Go => format!("pkg:golang/{}@{}", r.dependency.name, v),
+        Ecosystem::Npm => format!("pkg:npm/{name}@{v}"),
+        Ecosystem::Cargo => format!("pkg:cargo/{name}@{v}"),
+        Ecosystem::PyPI => format!("pkg:pypi/{name}@{v}"),
+        Ecosystem::Go => format!("pkg:golang/{name}@{v}"),
+        Ecosystem::Ruby => format!("pkg:gem/{name}@{v}"),
+        // Packagist purls are namespaced (vendor/package); the name already carries the slash.
+        Ecosystem::Php => format!("pkg:composer/{name}@{v}"),
+        // Maven purls use group:artifact -> group/artifact.
+        Ecosystem::Maven => format!("pkg:maven/{}@{}", name.replacen(':', "/", 1), v),
+        Ecosystem::NuGet => format!("pkg:nuget/{name}@{v}"),
     }
 }

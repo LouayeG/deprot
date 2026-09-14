@@ -140,6 +140,8 @@ fn popular_for(eco: Ecosystem) -> &'static [&'static str] {
         Ecosystem::Cargo => POPULAR_CARGO,
         Ecosystem::PyPI => POPULAR_PYPI,
         Ecosystem::Go => POPULAR_GO,
+        // No bundled popular-name list for these yet; typosquat radar is a no-op until one lands.
+        Ecosystem::Ruby | Ecosystem::Php | Ecosystem::Maven | Ecosystem::NuGet => &[],
     }
 }
 

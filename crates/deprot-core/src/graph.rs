@@ -57,6 +57,12 @@ impl DepGraph {
         &self.nodes
     }
 
+    /// All nodes, mutably — used by lockfile parsers that only learn a node's `direct` status after
+    /// the whole file is read (e.g. bundler lists direct gems in a trailing `DEPENDENCIES` section).
+    pub fn nodes_mut(&mut self) -> &mut [DepNode] {
+        &mut self.nodes
+    }
+
     /// Number of nodes.
     pub fn len(&self) -> usize {
         self.nodes.len()
