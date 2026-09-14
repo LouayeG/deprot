@@ -64,6 +64,7 @@ deprot --recursive          # monorepo? grade every subproject (npm + Cargo + Go
 deprot --vulns              # vuln-first: every CVE, its severity, and the fix version
 deprot --secrets            # scan your own source for leaked API keys / tokens / private keys
 deprot --workflows          # audit .github/workflows for CI supply-chain risks
+deprot --hygiene            # score the repo's security posture (0–100)
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -104,6 +105,11 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- 🧰 **`--hygiene` — score your repo's security posture.** A keyless, local mini-Scorecard: security
+  policy, a committed lockfile (per ecosystem), a `.gitignore` that actually covers secrets, **no
+  committed credential files** (tracked-only via `git ls-files`, `.example` templates allowed),
+  automated dependency updates, CI, and CODEOWNERS — weighted into a **0–100 grade** with per-gap
+  remediation. Fails CI only on a serious gap (e.g. a committed credential), not routine nits.
 - ⚙️ **`--workflows` — lock down your CI.** Audits `.github/workflows` for the current GitHub Actions
   supply-chain attacks: **template injection** (untrusted `${{ github.event.* }}` in `run:`),
   **pwn-requests** (`pull_request_target`/`workflow_run` checking out untrusted PR code with secrets),
