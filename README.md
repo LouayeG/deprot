@@ -66,6 +66,7 @@ deprot --secrets            # scan your own source for leaked API keys / tokens 
 deprot --workflows          # audit .github/workflows for CI supply-chain risks
 deprot --hygiene            # score the repo's security posture (0–100)
 deprot --reach              # which deps are actually imported? (find unused ones)
+deprot --malware            # scan source for dropper / malicious-code signatures
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -106,6 +107,12 @@ The stuff cloud tools don't do locally — all free, all keyless:
 - 🌳 **`--tree` — see the whole iceberg.** Resolves your *entire* dependency tree from the lockfile,
   scores every package at its exact locked version, and shows each one's **blast radius** (how many of
   your packages it puts at risk). Then it names the single **highest-leverage fix**.
+- ☣️ **`--malware` — catch code that shouldn't be there.** Scans source for the specific signatures of
+  supply-chain malware and droppers — **obfuscated `eval`** (running a base64/hex decode), **reverse
+  shells** (`/dev/tcp`, `nc -e`, `bash -i`), **`curl | sh`**, **cloud-metadata (IMDS) credential
+  probes** (`169.254.169.254`), **credential-file access** (`~/.aws/credentials`, SSH keys, `.npmrc`,
+  browser stores), heavy **obfuscation**, and **history tampering** — tuned for low false positives.
+  `--json` / `--sarif`; fails CI on a high/critical hit.
 - 🎯 **`--reach` — is the risky dependency even used?** Scans your source imports and classifies each
   dependency as **used** (with the file it's imported in), **unused** (a runtime dep never imported —
   a removal candidate and needless attack surface), or **dev**. Finer than a runtime-vs-build split,
