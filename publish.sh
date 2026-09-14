@@ -23,6 +23,7 @@ CRATES=(
   deprot-actions
   deprot-hygiene
   deprot-reach
+  deprot-malware
   deprot-manifest
   deprot-collect
   deprot-report

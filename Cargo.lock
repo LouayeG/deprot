@@ -392,6 +392,7 @@ dependencies = [
  "deprot-collect",
  "deprot-core",
  "deprot-hygiene",
+ "deprot-malware",
  "deprot-manifest",
  "deprot-policy",
  "deprot-reach",

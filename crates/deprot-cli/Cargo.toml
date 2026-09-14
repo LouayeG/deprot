@@ -22,6 +22,7 @@ deprot-secrets = { workspace = true }
 deprot-actions = { workspace = true }
 deprot-hygiene = { workspace = true }
 deprot-reach = { workspace = true }
+deprot-malware = { workspace = true }
 deprot-manifest = { workspace = true }
 deprot-collect = { workspace = true }
 deprot-report = { workspace = true }

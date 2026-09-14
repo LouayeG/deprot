@@ -11,11 +11,11 @@ use clap::Parser;
 use deprot_collect::{Collector, CollectorConfig};
 use deprot_core::{Severity, Tier};
 use deprot_report::{
-    explain, hygiene_json, hygiene_summary, hygiene_table, reach_json, reach_summary, reach_table,
-    secret_json, secret_sarif, secret_summary, secret_table, summary_banner, table, to_json,
-    to_json_packages, tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary,
-    vuln_table, workflow_json, workflow_sarif, workflow_summary, workflow_table, Row, TreeRow,
-    VulnFinding,
+    explain, hygiene_json, hygiene_summary, hygiene_table, malware_json, malware_sarif,
+    malware_summary, malware_table, reach_json, reach_summary, reach_table, secret_json,
+    secret_sarif, secret_summary, secret_table, summary_banner, table, to_json, to_json_packages,
+    tree_summary, tree_table, tree_to_json, vuln_json, vuln_sarif, vuln_summary, vuln_table,
+    workflow_json, workflow_sarif, workflow_summary, workflow_table, Row, TreeRow, VulnFinding,
 };
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
@@ -74,6 +74,12 @@ struct Cli {
     /// runtime dep never imported — a removal candidate), or dev. Advisory (does not fail CI).
     #[arg(long)]
     reach: bool,
+
+    /// Scan the source for malicious-code / dropper signatures: obfuscated eval, reverse shells,
+    /// curl|sh, cloud-metadata credential probes, credential-file access, obfuscation, and history
+    /// tampering. --json / --sarif for CI. Exits non-zero on a high/critical finding.
+    #[arg(long)]
+    malware: bool,
 
     /// Analyze the packages actually installed on disk — the project's node_modules and the active
     /// Python environment — at their exact installed versions, instead of the manifest. Catches
@@ -212,6 +218,11 @@ async fn run() -> Result<()> {
     // Reachability: which declared dependencies are actually imported.
     if cli.reach {
         return run_reach(&cli);
+    }
+
+    // Malicious-code scan: search the source for dropper/malware signatures.
+    if cli.malware {
+        return run_malware(&cli);
     }
 
     // Installed mode analyzes the packages actually present on disk.
@@ -602,6 +613,35 @@ fn run_reach(cli: &Cli) -> Result<()> {
         println!("{}", reach_table(&usages));
         println!();
         println!("{}", reach_summary(&usages));
+    }
+    Ok(())
+}
+
+/// Malicious-code scan: search the source for dropper/malware signatures and report them (table,
+/// JSON, or SARIF). Exits non-zero on a high/critical finding. Pure filesystem work — no network.
+fn run_malware(cli: &Cli) -> Result<()> {
+    let findings = deprot_malware::scan_path(&cli.path);
+
+    if cli.sarif {
+        println!("{}", malware_sarif(&findings));
+    } else if cli.json {
+        println!("{}", malware_json(&findings));
+    } else {
+        eprintln!(
+            "{} {} {} for suspicious code ...",
+            "deprot".bold(),
+            "scanning".dimmed(),
+            cli.path.display(),
+        );
+        if !findings.is_empty() {
+            println!("{}", malware_table(&findings));
+            println!();
+        }
+        println!("{}", malware_summary(&findings));
+    }
+
+    if findings.iter().any(|f| f.severity >= Severity::High) {
+        std::process::exit(1);
     }
     Ok(())
 }
