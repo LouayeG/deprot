@@ -53,7 +53,7 @@ cargo install deprot
 ```
 
 <sub>Published on **[crates.io](https://crates.io/crates/deprot)**. Prefer a binary? Grab one from
-[Releases](https://github.com/LouayeG/deprot/releases). Building from source needs a Rust toolchain.</sub>
+[Releases](https://github.com/LouayeG/deprot/releases). Building from source needs **Rust 1.90+**.</sub>
 
 ## 60-second tour
 
@@ -68,6 +68,7 @@ deprot --hygiene            # score the repo's security posture (0–100)
 deprot --reach              # which deps are actually imported? (find unused ones)
 deprot --malware            # AST-aware scan for dropper / malicious-code signatures
 deprot --watch -- npm ci    # run an install/build & flag every outbound connection it makes
+deprot --badge > badge.svg  # an embeddable grade badge for your README
 deprot --explain lodash     # why did this get that grade? (full breakdown)
 deprot --tui                # explore it all in a slick terminal UI
 deprot --fail-on risky      # exit non-zero for CI — fail the build on RISKY
@@ -197,9 +198,28 @@ number is their weighted average (a missing data source lowers confidence, it do
 | GitHub API | *optional* token | deeper repo signals — never required |
 
 **Ecosystems (8):** npm, crates.io, PyPI, Go, RubyGems, Packagist (PHP), Maven, and NuGet — parsed
-from their manifests (`package.json`, `Cargo.toml`, `go.mod`, `Gemfile`, `composer.json`, `pom.xml`,
-`*.csproj`/`packages.config`) and, where present, their lockfiles for exact versions. deps.dev
-doesn't index Packagist, so PHP vulnerabilities come straight from OSV.
+from their manifests (`package.json`, `Cargo.toml`, `go.mod`, `requirements.txt`/`pyproject.toml`,
+`Gemfile`, `composer.json`, `pom.xml`, `*.csproj`/`packages.config`) and, where present, their
+lockfiles for exact versions. deps.dev doesn't index Packagist, so PHP vulnerabilities come straight
+from OSV.
+
+### What works where
+
+Grading, vulnerabilities, typosquat, tree/blast-radius and SBOM/SARIF span all eight ecosystems.
+A few source-analysis features depend on a per-ecosystem scanner that isn't wired everywhere yet —
+deprot tells you honestly rather than pretending (e.g. `--reach` reports `unscanned` where it has no
+importer). Current coverage:
+
+| Ecosystem | Grade & vulns | Lockfile tree | `--reach` | `--deep` maintainers |
+|-----------|:---:|:---:|:---:|:---:|
+| npm       | ✓ | ✓ | ✓ | ✓ |
+| crates.io | ✓ | ✓ | ✓ | ✓ |
+| Go        | ✓ | — | ✓ | — |
+| PyPI      | ✓ | via `--installed` | — | — |
+| RubyGems  | ✓ | ✓ | — | — |
+| Packagist | ✓ (OSV) | ✓ | — | — |
+| Maven     | ✓ | — | — | — |
+| NuGet     | ✓ | — | — | — |
 
 Results are cached on disk (24h TTL) so re-runs are instant and polite to the APIs.
 
